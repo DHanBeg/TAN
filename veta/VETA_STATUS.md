@@ -452,9 +452,31 @@ başlanmadı) + Isolation/2D (tek-thread sınırı hâlâ geçerli).
   Semantic+AI Memory+Central Core+Optimizer+Plugin+Autonomy+Evolution+
   Distributed (hepsi tek-node, eşzamanlılık yok — 2D derleyici işi ayrı,
   float fonksiyonlar bozuk — KRİTİK BULGU 3, dinamik dispatch yok —
-  TAN'da fonksiyon-değeri yok). Kalan: Frontend (kısmi iskelet var,
-  bu oturumda doğrulanmadı), 2D eşzamanlılık (derleyici-seviyesi,
-  ÇOK YÜKSEK karmaşıklık, ayrı dikkatli oturum gerektirir).
+  TAN'da fonksiyon-değeri yok). Kalan: 2D eşzamanlılık (derleyici-
+  seviyesi, ÇOK YÜKSEK karmaşıklık, ayrı dikkatli oturum gerektirir).
+
+## Frontend ✅ DOĞRULANDI (2026-08-23) — React+Vite+TS, çalışıyor
+
+`veta/frontend/` — React 19 + Vite 8 + TypeScript, `recharts` (grafik),
+`lucide-react` (ikon). `scripts/gercekVeriTopla.mjs`: panodaki HER
+alanın altında gerçek bir git/dosya-sistemi komutu var (uydurma sayı
+YOK — script'in kendi dokümantasyonunun iddiası, kod okunarak
+doğrulandı). Bu oturumda gerçekten çalıştırıldı:
+- `node scripts/gercekVeriTopla.mjs` → gerçek git log/commit sayısı/
+  `.tan` dosya sayısı (192)/TancElf boyutu (407 KB) okuyup
+  `src/data/gercekVeri.json` üretti (gitignore'da, çıktı dosyası,
+  kaynak değil — doğru).
+- `npx tsc -b` → SIFIR tip hatası.
+- `npx vite build` → başarılı (567 KB JS, "chunk büyük" UYARISI var
+  ama HATA yok — code-splitting ileride yapılabilir, kapsam dışı).
+- `npx vite --port 5183` (dev server) → `curl` ile doğrulandı: index.html
+  200 dönüyor, `/src/main.tsx` ve `/src/App.tsx` doğru transpile edilip
+  serve ediliyor (React refresh injection dahil).
+**Bilinen sınır:** Chrome uzantısı bu oturumda bağlı değildi, GERÇEK
+GÖRSEL RENDER (tarayıcıda açıp ekran görüntüsü) DOĞRULANAMADI — sadece
+derleme+servis zinciri (build/type-check/dev-server-response)
+doğrulandı. Görsel doğrulama (layout bozuk mu, component gerçekten
+render oluyor mu) sonraki oturumda Chrome uzantısı bağlıyken yapılmalı.
 
 ## Sonraki Adımlar
 
