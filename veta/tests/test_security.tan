@@ -43,4 +43,40 @@ kurcalanan[3] = "kurcalandi"
 toplam = toplam + 1
 gecti = gecti + iddiaSayi(0, guvenlikDenetimDogrula(g), "guvenlikDenetimDogrula: kurcalanan kayit tespit ediliyor")
 
+# --- RBAC rol katmani ---
+g = guvenlikRolVer(g, "demir", "editor")
+roller = guvenlikKullaniciRolleri(g, "demir")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, uzunluk(roller), "guvenlikRolVer: kullaniciya 1 rol atandi")
+
+g = guvenlikRolIzinVer(g, "editor", "sil")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, guvenlikYetkiliMi(g, "demir", "sil"), "guvenlikYetkiliMi: DOGRUDAN izin hala yok (rol ayri)")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, guvenlikRolYetkiliMi(g, "demir", "sil"), "guvenlikRolYetkiliMi: rol uzerinden izin taniniyor")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, guvenlikYetkiliMiTam(g, "demir", "sil"), "guvenlikYetkiliMiTam: rol uzerinden izni de kabul ediyor")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, guvenlikYetkiliMiTam(g, "demir", "yaz"), "guvenlikYetkiliMiTam: dogrudan izni de kabul ediyor")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, guvenlikYetkiliMiTam(g, "demir", "olmayan-izin"), "guvenlikYetkiliMiTam: ne dogrudan ne rolle olan izin reddediliyor")
+
+# rolu olmayan baska kullanici etkilenmemeli
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, guvenlikRolYetkiliMi(g, "baskasi", "sil"), "guvenlikRolYetkiliMi: rolu olmayan kullanici izin almiyor")
+
+# ayni rolu tekrar atama - liste buyumemeli (idempotent)
+g = guvenlikRolVer(g, "demir", "editor")
+rollerTekrar = guvenlikKullaniciRolleri(g, "demir")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, uzunluk(rollerTekrar), "guvenlikRolVer: ayni rol tekrar ataninca liste buyumuyor")
+
+# ikinci rol ekleme
+g = guvenlikRolVer(g, "demir", "denetci")
+g = guvenlikRolIzinVer(g, "denetci", "denetim-oku")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(2, uzunluk(guvenlikKullaniciRolleri(g, "demir")), "guvenlikRolVer: ikinci rol eklendi, toplam 2")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, guvenlikRolYetkiliMi(g, "demir", "denetim-oku"), "guvenlikRolYetkiliMi: ikinci rolun izni de taniniyor")
+
 d = testSonuc(gecti, toplam)

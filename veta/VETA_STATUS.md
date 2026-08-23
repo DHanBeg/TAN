@@ -511,6 +511,17 @@ tabanlı trambolin + r13 register'ının TÜM çağrı zinciri boyunca
 korunması gerekiyor (eski Go implementasyonunda kanıtlanmış desen,
 ama self-hosted derleyiciye taşınması ayrı bir dikkatli oturum ister).
 
+## Security RBAC Rol Katmanı ✅ TAMAMLANDI (2026-08-23)
+
+`veta/libraries/security/source/security.tan` — üç seviyeli RBAC eklendi:
+kullanıcı->rol->izin (`guvenlikRolVer/guvenlikRolIzinVer/
+guvenlikRolYetkiliMi/guvenlikKullaniciRolleri`), eski doğrudan
+kullanıcı->izin yolu KORUNDU (geriye uyumlu), `guvenlikYetkiliMiTam`
+ikisini birleştirir. guvenlik bağlamı 3→5 elemana büyüdü, TÜM eski
+fonksiyonlar güncellendi. Test: `veta/tests/test_security.tan` — 19/19
+GEÇTİ (eski 9 + yeni 10 RBAC testi: rol atama/idempotent/çoklu-rol/
+izole-kullanıcı senaryoları).
+
 ## Ağ Sunucusu ✅ TAMAMLANDI (2026-08-23) — gerçek HTTP/1.0 sunucu, curl ile doğrulandı
 
 `veta/server/source/veta_sunucu.tan` — `araclar/registrys.tan` (Kaldıraç 4,

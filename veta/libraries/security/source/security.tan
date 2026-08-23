@@ -5,28 +5,38 @@
 # authorization, RBAC, tenant isolation, audit, tamper evidence."
 #
 # DÜRÜST KAPSAM (v1):
-#   - RBAC'ın "rol" katmanı YOK — doğrudan kullanıcı->izin eşlemesi
-#     (basitleştirme, TAN'da nested sözlük/struct çalışmadığı için
-#     — bkz VETA_STATUS.md kayıt/sözlük bug'ı). Rol katmanı sonraki iş.
+#   - RBAC ROL KATMANI VAR (2026-08-23 eklendi): kullanıcı->rol->izin
+#     (üç seviyeli, HashTablo zincirlemesiyle). Ayrıca eski doğrudan
+#     kullanıcı->izin yolu da (guvenlikIzinVer/guvenlikYetkiliMi) KORUNDU
+#     — geriye dönük uyumlu, ikisi BİRLİKTE kullanılabilir
+#     (guvenlikYetkiliMiTam ikisini de kontrol eder).
 #   - Şifre hash'i sha256 (gerçek salt/bcrypt YOK, TAN'da o API yok,
 #     kapsam dışı, dürüstçe belirtilir).
 #   - Audit log HASH-CHAIN (tamper-evident) — bu gerçek çalışan bir
 #     özellik: bir kayıt sonradan değiştirilirse zincir doğrulaması
 #     (guvenlikDenetimDogrula) bunu yakalar.
 #
-# Yapı: guvenlik = [kullanicilarHt, izinlerHt, denetimListesi]
-#   kullanicilarHt : HashTablo, kullaniciAdi -> sha256(sifre) (hex)
-#   izinlerHt      : HashTablo, "kullaniciAdi|izin" -> "1"
-#   denetimListesi : dizi, her eleman
+# Yapı: guvenlik = [kullanicilarHt, izinlerHt, denetimListesi,
+#                    kullaniciRolleriHt, rolIzinleriHt]
+#   kullanicilarHt   : HashTablo, kullaniciAdi -> sha256(sifre) (hex)
+#   izinlerHt        : HashTablo, "kullaniciAdi|izin" -> "1" (DOĞRUDAN izin)
+#   denetimListesi   : dizi, her eleman
 #     [sira, kullaniciAdi, eylem, sonuc, oncekiHash, buKaydinHash]
+#   kullaniciRolleriHt: HashTablo, kullaniciAdi -> rollerin KARAKTER(1) ile
+#     birleştirilmiş listesi (bir kullanıcının birden fazla rolü olabilir)
+#   rolIzinleriHt    : HashTablo, "rol|izin" -> "1"
 #
 # Kullanım:
 #   içe al "veta/libraries/security/source/security.tan"
 #   g = guvenlikAc()
 #   g = guvenlikKullaniciEkle(g, "demir", "sifre123")
 #   ok = guvenlikDogrula(g, "demir", "sifre123")        # 1
-#   g = guvenlikIzinVer(g, "demir", "yaz")
+#   g = guvenlikIzinVer(g, "demir", "yaz")               # dogrudan izin
 #   yetkili = guvenlikYetkiliMi(g, "demir", "yaz")       # 1
+#   g = guvenlikRolVer(g, "demir", "editor")             # RBAC: rol ata
+#   g = guvenlikRolIzinVer(g, "editor", "sil")           # RBAC: role izin ver
+#   yetkiliRolIle = guvenlikRolYetkiliMi(g, "demir", "sil")  # 1 (editor uzerinden)
+#   yetkiliTam = guvenlikYetkiliMiTam(g, "demir", "sil")      # 1 (dogrudan VEYA rol)
 #   g = guvenlikDenetimKaydet(g, "demir", "yaz-yapti", "basarili")
 #   zincirSaglam = guvenlikDenetimDogrula(g)             # 1
 #
@@ -38,16 +48,55 @@ içe al "kutuphane/ozet.tan"
 içe al "kutuphane/HashTablo.tan"
 içe al "kutuphane/sha256.tan"
 
+# dizideIndeksi(dizi, aranan): lineer arama (diğer core'larla aynı
+# yerel-kopya desen).
+işlev dizideIndeksi(dizi, aranan)
+    i = 0
+    n = uzunluk(dizi)
+    iken i < n
+        mevcut = metinBirlestir("", dizi[i])
+        eğer metinEsit(mevcut, aranan) ise
+            döndür i
+        son
+        i = i + 1
+    son
+    döndür 0 - 1
+son
+
+# dizeyeBol(icerik, ayracKarakter): icerik'i ayraca göre parçalara böler
+# (graph.tan/semantic.tan ile aynı yerel-kopya desen).
+işlev dizeyeBol(icerik, ayracKarakter)
+    eğer metinEsit(icerik, "") ise
+        döndür []
+    son
+    n = uzunluk(icerik)
+    parcalar = []
+    mevcut = ""
+    i = 0
+    iken i < n
+        c = metinAl(icerik, i)
+        eğer metinEsit(c, ayracKarakter) ise
+            parcalar = ekle(parcalar, mevcut)
+            mevcut = ""
+        değilse
+            mevcut = metinBirlestir(mevcut, c)
+        son
+        i = i + 1
+    son
+    parcalar = ekle(parcalar, mevcut)
+    döndür parcalar
+son
+
 # guvenlikAc(): boş güvenlik bağlamı kurar.
 işlev guvenlikAc()
-    döndür [htYeni(), htYeni(), []]
+    döndür [htYeni(), htYeni(), [], htYeni(), htYeni()]
 son
 
 # guvenlikKullaniciEkle(guvenlik, kullaniciAdi, sifre): kullanıcının
 # şifre hash'ini (sha256) kaydeder. YENİ guvenlik döndürür.
 işlev guvenlikKullaniciEkle(guvenlik, kullaniciAdi, sifre)
     kullanicilarHt = htKoy(guvenlik[0], kullaniciAdi, sha256(sifre))
-    döndür [kullanicilarHt, guvenlik[1], guvenlik[2]]
+    döndür [kullanicilarHt, guvenlik[1], guvenlik[2], guvenlik[3], guvenlik[4]]
 son
 
 # guvenlikDogrula(guvenlik, kullaniciAdi, sifre): şifre doğruysa 1,
@@ -68,7 +117,75 @@ son
 işlev guvenlikIzinVer(guvenlik, kullaniciAdi, izin)
     anahtar = metinBirlestir(metinBirlestir(kullaniciAdi, "|"), izin)
     izinlerHt = htKoy(guvenlik[1], anahtar, "1")
-    döndür [guvenlik[0], izinlerHt, guvenlik[2]]
+    döndür [guvenlik[0], izinlerHt, guvenlik[2], guvenlik[3], guvenlik[4]]
+son
+
+# guvenlikRolVer(guvenlik, kullaniciAdi, rol): kullanıcıya bir RBAC rolü
+# atar (birden fazla rolü olabilir, tekrar atama idempotent). YENİ
+# guvenlik döndürür.
+işlev guvenlikRolVer(guvenlik, kullaniciAdi, rol)
+    mevcutStr = htAl(guvenlik[3], kullaniciAdi)
+    roller = dizeyeBol(mevcutStr, karakter(1))
+    eğer dizideIndeksi(roller, rol) < 0 ise
+        roller = ekle(roller, rol)
+    son
+    yeniStr = ""
+    i = 0
+    n = uzunluk(roller)
+    iken i < n
+        eğer i == 0 ise
+            yeniStr = metinBirlestir("", roller[i])
+        değilse
+            yeniStr = metinBirlestir(metinBirlestir(yeniStr, karakter(1)), metinBirlestir("", roller[i]))
+        son
+        i = i + 1
+    son
+    kullaniciRolleriHt = htKoy(guvenlik[3], kullaniciAdi, yeniStr)
+    döndür [guvenlik[0], guvenlik[1], guvenlik[2], kullaniciRolleriHt, guvenlik[4]]
+son
+
+# guvenlikKullaniciRolleri(guvenlik, kullaniciAdi): kullanıcının rol
+# listesini döndürür (hiç rolü yoksa boş dizi).
+işlev guvenlikKullaniciRolleri(guvenlik, kullaniciAdi)
+    mevcutStr = htAl(guvenlik[3], kullaniciAdi)
+    döndür dizeyeBol(mevcutStr, karakter(1))
+son
+
+# guvenlikRolIzinVer(guvenlik, rol, izin): bir role izin tanır ("rol|izin"
+# birleşik anahtarla — o role sahip TÜM kullanıcılar bu izni miras alır).
+# YENİ guvenlik döndürür.
+işlev guvenlikRolIzinVer(guvenlik, rol, izin)
+    anahtar = metinBirlestir(metinBirlestir(rol, "|"), izin)
+    rolIzinleriHt = htKoy(guvenlik[4], anahtar, "1")
+    döndür [guvenlik[0], guvenlik[1], guvenlik[2], guvenlik[3], rolIzinleriHt]
+son
+
+# guvenlikRolYetkiliMi(guvenlik, kullaniciAdi, izin): kullanıcının SAHİP
+# OLDUĞU rollerden HERHANGİ BİRİ bu izni veriyorsa 1, hiçbiri vermiyorsa
+# (veya kullanıcının hiç rolü yoksa) 0 döndürür.
+işlev guvenlikRolYetkiliMi(guvenlik, kullaniciAdi, izin)
+    roller = guvenlikKullaniciRolleri(guvenlik, kullaniciAdi)
+    n = uzunluk(roller)
+    i = 0
+    iken i < n
+        rol = metinBirlestir("", roller[i])
+        anahtar = metinBirlestir(metinBirlestir(rol, "|"), izin)
+        eğer htVarMi(guvenlik[4], anahtar) ise
+            döndür 1
+        son
+        i = i + 1
+    son
+    döndür 0
+son
+
+# guvenlikYetkiliMiTam(guvenlik, kullaniciAdi, izin): DOĞRUDAN izin
+# (guvenlikIzinVer) VEYA rol üzerinden (guvenlikRolYetkiliMi) izin
+# varsa 1 döndürür — RBAC + doğrudan izin yollarının BİRLEŞİMİ.
+işlev guvenlikYetkiliMiTam(guvenlik, kullaniciAdi, izin)
+    eğer guvenlikYetkiliMi(guvenlik, kullaniciAdi, izin) == 1 ise
+        döndür 1
+    son
+    döndür guvenlikRolYetkiliMi(guvenlik, kullaniciAdi, izin)
 son
 
 # guvenlikYetkiliMi(guvenlik, kullaniciAdi, izin): kullanıcının bu
@@ -97,7 +214,7 @@ işlev guvenlikDenetimKaydet(guvenlik, kullaniciAdi, eylem, sonuc)
     buKaydinHash = sha256(gövde)
     kayit = [sira, kullaniciAdi, eylem, sonuc, oncekiHash, buKaydinHash]
     yeniDenetim = ekle(denetim, kayit)
-    döndür [guvenlik[0], guvenlik[1], yeniDenetim]
+    döndür [guvenlik[0], guvenlik[1], yeniDenetim, guvenlik[3], guvenlik[4]]
 son
 
 # guvenlikDenetimDogrula(guvenlik): TÜM hash-chain'i baştan tarar,
