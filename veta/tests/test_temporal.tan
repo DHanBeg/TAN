@@ -1,0 +1,73 @@
+# test_temporal.tan — VETA Temporal Core (zamanAc/zamanYaz/zamanOku/
+# zamanSil/zamanGecmis/zamanVersiyonSayisi) testleri. "Asla silme" ilkesi.
+
+içe al "kutuphane/test.tan"
+içe al "../libraries/temporal/source/temporal.tan"
+
+gecti = 0
+toplam = 0
+
+fdTemiz1 = dosyaAc("/tmp/tan_test_temporal.tdb", 1)
+z = dosyaYazKonum(fdTemiz1, 0, "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+z = dosyaKapat(fdTemiz1)
+fdTemiz2 = dosyaAc("/tmp/tan_test_temporal.tdb.wal", 1)
+z = dosyaYazKonum(fdTemiz2, 0, "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+z = dosyaKapat(fdTemiz2)
+
+zt = zamanAc("/tmp/tan_test_temporal.tdb")
+
+zt = zamanYaz(zt, "k", "v1")
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("v1", zamanOku(zt, "k"), "zamanYaz/zamanOku: ilk versiyon dogru okunuyor")
+
+zt = zamanYaz(zt, "k", "v2")
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("v2", zamanOku(zt, "k"), "zamanYaz: ikinci versiyon guncel deger olarak donuyor")
+
+zt = zamanYaz(zt, "k", "v3")
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("v3", zamanOku(zt, "k"), "zamanYaz: ucuncu versiyon guncel")
+
+# history - eskiden yeniye, tum versiyonlar korunmus olmali ("asla silme")
+gecmis = zamanGecmis(zt, "k")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(3, uzunluk(gecmis), "zamanGecmis: 3 versiyon de korunmus")
+
+v0 = gecmis[0]
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("v1", v0[1], "zamanGecmis: ilk versiyon (en eski) hala erisilebilir")
+v2 = gecmis[2]
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("v3", v2[1], "zamanGecmis: son versiyon dizinin sonunda")
+
+# zaman damgalari artan olmali
+zd0 = v0[0]
+zd1kayit = gecmis[1]
+zd1 = zd1kayit[0]
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, zd0 < zd1, "zamanGecmis: zaman damgalari artan sirali")
+
+# farkli key ile karismiyor
+zt = zamanYaz(zt, "baska", "X")
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("v3", zamanOku(zt, "k"), "zamanYaz: farkli key'e yazma diger key'i etkilemiyor")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(3, zamanVersiyonSayisi(zt, "k"), "zamanVersiyonSayisi: baska key'in versiyonu eklenmedi")
+
+# silme (tombstone)
+zt = zamanSil(zt, "k")
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("", zamanOku(zt, "k"), "zamanSil: silinen key artik okunmuyor")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(4, zamanVersiyonSayisi(zt, "k"), "zamanSil: silme de bir versiyon olarak sayiliyor (asla gercek silme yok)")
+
+gecmisSonrasi = zamanGecmis(zt, "k")
+sonKayit = gecmisSonrasi[3]
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("1", sonKayit[2], "zamanGecmis: son kayit tombstone olarak isaretli (silindiMi=1)")
+ilkKayitSonrasi = gecmisSonrasi[0]
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("v1", ilkKayitSonrasi[1], "zamanGecmis: silme sonrasi bile en eski versiyon korunmus")
+
+z = zamanKapat(zt)
+d = testSonuc(gecti, toplam)

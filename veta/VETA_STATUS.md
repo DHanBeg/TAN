@@ -2,6 +2,29 @@
 
 *Tarih: 2026-08-17. Son güncelleme — FAZ 1-5 tamamlandı, Faz 6 devam ediyor.*
 
+## ⚠️ KRİTİK BULGU 2 (2026-08-23) — TancElf iki durumda SESSİZCE yanlış derliyor
+
+1. **Çok satırlı ifade:** Bir ifade (örn. iç içe `metinBirlestir(...)` zinciri)
+   kapanış parantezi AYRI SATIRA düşecek şekilde bölünürse, TancElf hata
+   vermeden derliyor ama üretilen binary'nin İTHAL EDEN dosyadaki TÜM
+   sonraki top-level kod'u SESSİZCE ÇALIŞTIRMIYOR (parser cascading
+   desync — muhtemelen tek-satır-tabanlı bir ayrıştırma varsayımı var).
+   Tespit: `veta/libraries/temporal/source/temporal.tan` yazılırken
+   `zamanSil` içinde bulundu, ikili arama ile (fonksiyon fonksiyon
+   dosyayı kesip test ederek) izole edildi. **Kural: HER ifade TEK
+   SATIRDA bitmeli, kapanış parantezini asla sonraki satıra düşürme.**
+2. **`X değilse` bir "değil" (not) operatörü DEĞİL** — sadece `eğer ...
+   ise ... değilse ... son` bloğunun "else" dalı. `iken KOŞUL değilse`
+   gibi bir kullanım (örn. `iken metinEsit(a,b) değilse`) GEÇERSİZ
+   sözdizimi ama TancElf bunu da SESSİZCE kabul edip yine aynı şekilde
+   sonraki kodu bozuyor. **Doğrusu:** `metinEsit(a,b) == 0` kullan
+   (bkz `!=` operatörü int karşılaştırmada var, metinEsit sonucu
+   0/1 int döndürdüğü için `== 0` ile negatif edilir).
+   Her iki bulgu da `veta/tests/test_temporal.tan` (13/13 GEÇTİ) ile
+   düzeltilip doğrulandı. **Bu iki desen tüm VETA kod tabanında
+   (mevcut + gelecek) kontrol edilmeli** — opencode'un ürettiği kodda
+   özellikle risk yüksek (weak model uzun satırları sarmalayabilir).
+
 ## ⚠️ KRİTİK BULGU (2026-08-23) — `kayıt`(struct)/`sözlük()` kullanan dosyalar KIRIK
 
 `kutuphane/AdaptiveCache.tan`, `LsmDeposu.tan`, `BAgaci.tan`, `TemporalEngine.tan`
@@ -256,7 +279,18 @@ başlanmadı) + Isolation/2D (tek-thread sınırı hâlâ geçerli).
   — derlenemezdi). nemotron-3-ultra-free denendi, o da yanlış sözdizimi
   üretti. Kullanıcı onayıyla bu dosyayı **Claude doğrudan yazdı**
   (istisna — normal akışta kod yazımı opencode'a bırakılıyor).
-- **Durum:** Storage+Query+Event+Memory+Security bitti (tek-node, eşzamanlılık yok). Sıradaki: Temporal core veya Central Core.
+- **Temporal core** ✅ TAMAMLANDI (2026-08-23) — `veta/libraries/temporal/source/temporal.tan`.
+  MVCC-lite: `zamanAc/zamanKapat/zamanYaz/zamanOku/zamanSil/zamanGecmis/
+  zamanVersiyonSayisi`. "Asla silme" ilkesi — her yazım YENİ sayfaya gider,
+  eski versiyon hiç üzerine yazılmaz; silme de tombstone (yeni versiyon).
+  Branch/Version-Compare KAPSAM DIŞI (dürüst). Zaman damgası mantıksal
+  sayaç (gerçek wall-clock TAN'da yok). `kutuphane/TemporalEngine.tan`
+  (NEXUS, kayıt/sözlük kullanıyor) KULLANILMADI — sıfırdan PageManager+
+  Islem+HashTablo üzerine yazıldı. Test: `veta/tests/test_temporal.tan`
+  — 13/13 GEÇTİ (WSL native). Bu core'u yazarken KRİTİK BULGU 2 (yukarı
+  bakın: çok satırlı ifade + `X değilse` yanlış kullanımı) bulundu ve
+  düzeltildi.
+- **Durum:** Storage+Query+Event+Memory+Security+Temporal bitti (tek-node, eşzamanlılık yok). Sıradaki: Central Core veya Distributed/Semantic/Graph/AI Memory/Observability/Optimizer/Plugin/Autonomy/Evolution (hepsi sıfır kod).
 
 ## Sonraki Adımlar
 

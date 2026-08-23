@@ -1,0 +1,216 @@
+# ============================================================
+# temporal.tan — VETA Temporal Core (MVCC-lite: versioning, time-travel)
+# ------------------------------------------------------------
+# VETA master prompt Temporal Core tanımı: "MVCC, Immutable Versioning,
+# Snapshot, Time Travel, History, Branch, Version Compare."
+#
+# DÜRÜST KAPSAM (v1): "Branch" ve "Version Compare" YOK (kapsam dışı,
+# sonraki iş). Bu v1: **immutable versioning + time travel + history**
+# — "asla silme" ilkesi: bir key'e her yazım YENİ bir sayfaya gider,
+# eski sürüm ASLA üzerine yazılmaz. Zaman damgası gerçek wall-clock
+# DEĞİL — mantıksal artan sayaç (TAN'da sistem saati okuma API'si yok,
+# dürüstçe belirtilir).
+#
+# NOT: `kutuphane/TemporalEngine.tan` (NEXUS'tan) VAR ama `kayıt`/
+# `sözlük()` kullanıyor — TancElf'te sessizce çalışmıyor (bkz
+# VETA_STATUS.md bug kaydı). Bu dosya ONU KULLANMAZ, sıfırdan
+# kutuphane/PageManager.tan + Islem.tan + HashTablo.tan (kanıtlı
+# primitifler) üzerine yazıldı — query.tan ile AYNI desen.
+#
+# Sayfa kaydı (her versiyon kendi sayfasında, ASLA üzerine yazılmaz):
+#   key + KARAKTER(1) + zamanDamgasi + KARAKTER(1) + deger +
+#   KARAKTER(1) + oncekiSayfaNo + KARAKTER(1) + silindiMi
+#   (silindiMi: "0" normal versiyon, "1" tombstone/silme kaydı)
+#
+# Bağlam: [pm, wal, txSayacKutu, [sonSayfaHt], [zamanSayaciKutu]]
+#   sonSayfaHt: HashTablo, key -> EN SON versiyonun sayfa no'su
+#     (açılışta linear taramayla yeniden kurulur — sayfalar artan
+#     sırada yazıldığı için tarama sırasında son görülen kazanır)
+#   zamanSayaciKutu: [n] mutable kutu, mantıksal zaman sayacı
+#
+# Kullanım:
+#   içe al "veta/libraries/temporal/source/temporal.tan"
+#   z = zamanAc("veri.tdb")
+#   z = zamanYaz(z, "k", "v1")
+#   z = zamanYaz(z, "k", "v2")
+#   guncel = zamanOku(z, "k")            # "v2"
+#   gecmis = zamanGecmis(z, "k")         # [[1,"v1",0], [2,"v2",0]] (eskiden yeniye)
+#   z = zamanSil(z, "k")
+#   yok = zamanOku(z, "k")               # "" (tombstone sonrasi)
+#
+# NOT: Yeni dil özelliği/keyword EKLENMEDİ — sadece mevcut TAN dili
+# (işlev/eğer/iken/döndür) kullanıldı (proje kuralı).
+# ============================================================
+
+içe al "kutuphane/PageManager.tan"
+içe al "kutuphane/Islem.tan"
+içe al "kutuphane/ozet.tan"
+içe al "kutuphane/HashTablo.tan"
+içe al "kutuphane/araclar.tan"
+
+# alanlarAyir(icerik): sayfa içeriğini KARAKTER(1) ayracına göre
+# parçalara böler, karakter(0) (sayfa dolgusu) görünce durur.
+# Query.tan'daki sayfaKeyOku/sayfaDegerOku'nun genelleştirilmiş hali
+# (5 sabit alanlı bu kayıt formatı için).
+işlev alanlarAyir(icerik)
+    n = uzunluk(icerik)
+    alanlar = []
+    mevcut = ""
+    i = 0
+    iken i < n
+        k = kod(metinAl(icerik, i))
+        eğer k == 0 ise
+            i = n
+        değilse eğer k == 1 ise
+            alanlar = ekle(alanlar, mevcut)
+            mevcut = ""
+            i = i + 1
+        değilse
+            mevcut = metinBirlestir(mevcut, metinAl(icerik, i))
+            i = i + 1
+        son
+    son
+    alanlar = ekle(alanlar, mevcut)
+    döndür alanlar
+son
+
+# zamanAc(yol): bağlamı açar/oluşturur, sonSayfaHt'yi mevcut
+# sayfaları tarayarak yeniden kurar (her key için EN SON görülen
+# sayfa no'su kazanır — sayfalar yazım sırasına göre artan numaralı).
+işlev zamanAc(yol)
+    pm = pmAc(yol)
+    wal = walAc(metinBirlestir(yol, ".wal"))
+    ht = htYeni()
+    n = pmSayfaSayisi(pm)
+    i = 1
+    iken i < n
+        icerik = pmSayfaOku(pm, i)
+        alanlar = alanlarAyir(icerik)
+        eğer uzunluk(alanlar[0]) > 0 ise
+            ht = htKoy(ht, alanlar[0], metin(i))
+        son
+        i = i + 1
+    son
+    döndür [pm, wal, [1], [ht], [1]]
+son
+
+# zamanKapat(baglam): pm'i kapatır.
+işlev zamanKapat(baglam)
+    döndür pmKapat(baglam[0])
+son
+
+# zamanYaz(baglam, key, deger): key için YENİ bir versiyon sayfası
+# ekler (eski sayfa ASLA değiştirilmez). oncekiSayfaNo = mevcut son
+# versiyonun sayfa no'su (yoksa "-1"). YENİ baglam döndürür.
+işlev zamanYaz(baglam, key, deger)
+    pm = baglam[0]
+    wal = baglam[1]
+    txKutu = baglam[2]
+    htKutu = baglam[3]
+    zamanKutu = baglam[4]
+
+    oncekiStr = htAl(htKutu[0], key)
+    eğer metinEsit(oncekiStr, "") ise
+        onceki = "-1"
+    değilse
+        onceki = oncekiStr
+    son
+
+    zamanDamgasi = zamanKutu[0]
+    zamanKutu[0] = zamanDamgasi + 1
+
+    txId = txKutu[0]
+    txKutu[0] = txId + 1
+    tx = islemBaslat(pm, wal, txId)
+    no = pmSayfaAyir(pm)
+    icerik = metinBirlestir(metinBirlestir(metinBirlestir(metinBirlestir(metinBirlestir(key, karakter(1)), metin(zamanDamgasi)), karakter(1)), metinBirlestir(deger, karakter(1))), metinBirlestir(metinBirlestir(onceki, karakter(1)), "0"))
+    lsn = islemSayfaYaz(tx, no, icerik)
+    z = islemCommit(tx)
+
+    htKutu[0] = htKoy(htKutu[0], key, metin(no))
+    döndür [pm, wal, txKutu, htKutu, zamanKutu]
+son
+
+# zamanOku(baglam, key): key'in EN SON (güncel) değerini döndürür.
+# Son versiyon tombstone (silindi=1) ise "" döner (silinmiş demektir).
+# Key hiç yoksa da "" döner.
+işlev zamanOku(baglam, key)
+    htKutu = baglam[3]
+    sayfaNoStr = htAl(htKutu[0], key)
+    eğer metinEsit(sayfaNoStr, "") ise
+        döndür ""
+    son
+    pm = baglam[0]
+    sayfaNo = metneTam(sayfaNoStr)
+    icerik = pmSayfaOku(pm, sayfaNo)
+    alanlar = alanlarAyir(icerik)
+    silindiMi = alanlar[4]
+    eğer metinEsit(silindiMi, "1") ise
+        döndür ""
+    son
+    döndür alanlar[2]
+son
+
+# zamanSil(baglam, key): key için YENİ bir tombstone (silindi=1)
+# versiyonu ekler (asla gerçek silme yok — geçmiş versiyonlar kalır,
+# sadece "artık geçerli değil" işaretlenir). YENİ baglam döndürür.
+# Key mevcut değilse baglami degistirmeden döndürür.
+işlev zamanSil(baglam, key)
+    htKutu = baglam[3]
+    oncekiStr = htAl(htKutu[0], key)
+    eğer metinEsit(oncekiStr, "") ise
+        döndür baglam
+    son
+    pm = baglam[0]
+    wal = baglam[1]
+    txKutu = baglam[2]
+    zamanKutu = baglam[4]
+
+    zamanDamgasi = zamanKutu[0]
+    zamanKutu[0] = zamanDamgasi + 1
+
+    txId = txKutu[0]
+    txKutu[0] = txId + 1
+    tx = islemBaslat(pm, wal, txId)
+    no = pmSayfaAyir(pm)
+    icerik = metinBirlestir(metinBirlestir(metinBirlestir(metinBirlestir(metinBirlestir(key, karakter(1)), metin(zamanDamgasi)), karakter(1)), metinBirlestir("", karakter(1))), metinBirlestir(metinBirlestir(oncekiStr, karakter(1)), "1"))
+    lsn = islemSayfaYaz(tx, no, icerik)
+    z = islemCommit(tx)
+
+    htKutu[0] = htKoy(htKutu[0], key, metin(no))
+    döndür [pm, wal, txKutu, htKutu, zamanKutu]
+son
+
+# zamanGecmis(baglam, key): key'in TÜM versiyonlarını (tombstone dahil)
+# ESKİDEN YENİYE sırayla döndürür. Her eleman [zamanDamgasi, deger,
+# silindiMi] (deger tombstone kayıtlarda "" olur). Key hiç yoksa boş
+# dizi döner. Zincir en son sayfadan oncekiSayfaNo takip edilerek
+# GERİYE doğru gezilir, sonra sıra tersine çevrilir (eskiden yeniye).
+işlev zamanGecmis(baglam, key)
+    htKutu = baglam[3]
+    pm = baglam[0]
+    sayfaNoStr = htAl(htKutu[0], key)
+    tersSirali = []
+    iken metinEsit(sayfaNoStr, "-1") == 0 ve metinEsit(sayfaNoStr, "") == 0
+        sayfaNo = metneTam(sayfaNoStr)
+        icerik = pmSayfaOku(pm, sayfaNo)
+        alanlar = alanlarAyir(icerik)
+        versiyon = [metneTam(alanlar[1]), alanlar[2], alanlar[4]]
+        tersSirali = ekle(tersSirali, versiyon)
+        sayfaNoStr = alanlar[3]
+    son
+    n = uzunluk(tersSirali)
+    sonuc = []
+    i = n - 1
+    iken i >= 0
+        sonuc = ekle(sonuc, tersSirali[i])
+        i = i - 1
+    son
+    döndür sonuc
+son
+
+# zamanVersiyonSayisi(baglam, key): key'in kaç versiyonu (tombstone
+# dahil) olduğunu döndürür.
+işlev zamanVersiyonSayisi(baglam, key)
+    döndür uzunluk(zamanGecmis(baglam, key))
+son
