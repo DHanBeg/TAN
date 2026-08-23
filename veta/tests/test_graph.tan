@@ -1,10 +1,90 @@
-# test_graph.tan — VETA Graph (graph.tan) smoke test
-# Kompilasyon: qemu-x86_64 TancElf <bu_dosya> <cikti>
-# Çalıştırma:  qemu-x86_64 <cikti>
-# Kural: mevcut TancElf binary'sini kullan; Faz 6 zemini (Storage + Query + Transaction + Event + Graph hazır); QEMU throttle toleranı.
+# test_graph.tan — VETA Graph Core testleri. BFS/DFS/en kisa yol.
+#
+#   A -> B -> D
+#   A -> C -> D
+#   D -> E
+#   F (izole dugum, kimseyle bagli degil)
 
-içe al "../libraries/concurrency/source/graph.tan"
+içe al "kutuphane/test.tan"
+içe al "../libraries/graph/source/graph.tan"
 
-# Basit graph testi
-yaz("Graph Test: Düğüm ekleme aktif\n")
-yaus("Graph yapısı aktif\n")
+gecti = 0
+toplam = 0
+
+g = grafikAc()
+g = grafikKenarEkle(g, "A", "B")
+g = grafikKenarEkle(g, "A", "C")
+g = grafikKenarEkle(g, "B", "D")
+g = grafikKenarEkle(g, "C", "D")
+g = grafikKenarEkle(g, "D", "E")
+g = grafikDugumEkle(g, "F")
+
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, grafikDugumVarMi(g, "A"), "grafikKenarEkle: kaynak dugum otomatik eklendi")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, grafikDugumVarMi(g, "E"), "grafikKenarEkle: hedef dugum otomatik eklendi")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, grafikDugumVarMi(g, "olmayan"), "grafikDugumVarMi: olmayan dugum 0 donuyor")
+
+komsularA = grafikKomsular(g, "A")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(2, uzunluk(komsularA), "grafikKomsular: A'nin 2 komsusu var (B,C)")
+
+komsularF = grafikKomsular(g, "F")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, uzunluk(komsularF), "grafikKomsular: izole dugumun komsusu yok")
+
+# idempotent kenar ekleme
+g = grafikKenarEkle(g, "A", "B")
+komsularATekrar = grafikKomsular(g, "A")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(2, uzunluk(komsularATekrar), "grafikKenarEkle: ayni kenar tekrar eklenince kopya olusmuyor")
+
+# BFS
+bfsSira = grafikBFS(g, "A")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(5, uzunluk(bfsSira), "grafikBFS: A'dan erisilebilen 5 dugum (A,B,C,D,E)")
+ilkBfs = bfsSira[0]
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("A", ilkBfs, "grafikBFS: ilk ziyaret edilen baslangic dugumu")
+
+# BFS izole dugum icin sadece kendisi
+bfsF = grafikBFS(g, "F")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, uzunluk(bfsF), "grafikBFS: izole dugumden sadece kendisi erisilebilir")
+
+# DFS - ayni erisilebilir kume, farkli sira olabilir ama boyut ayni
+dfsSira = grafikDFS(g, "A")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(5, uzunluk(dfsSira), "grafikDFS: A'dan erisilebilen dugum sayisi BFS ile ayni (5)")
+
+# bounded BFS
+bfsSinirli0 = grafikBFSSinirli(g, "A", 0)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, uzunluk(bfsSinirli0), "grafikBFSSinirli: derinlik 0'da sadece baslangic")
+bfsSinirli1 = grafikBFSSinirli(g, "A", 1)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(3, uzunluk(bfsSinirli1), "grafikBFSSinirli: derinlik 1'de A+komsulari (3)")
+
+# en kisa yol
+yol = grafikEnKisaYol(g, "A", "E")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(4, uzunluk(yol), "grafikEnKisaYol: A->E en kisa yol 4 dugum (A,B veya C,D,E)")
+yolIlk = yol[0]
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("A", yolIlk, "grafikEnKisaYol: yol A ile basliyor")
+yolSon = yol[3]
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("E", yolSon, "grafikEnKisaYol: yol E ile bitiyor")
+
+# yolu olmayan durum
+yolYok = grafikEnKisaYol(g, "F", "A")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, uzunluk(yolYok), "grafikEnKisaYol: baglantisiz dugumler arasi yol yok (bos dizi)")
+
+# kaynak==hedef
+yolAyni = grafikEnKisaYol(g, "A", "A")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, uzunluk(yolAyni), "grafikEnKisaYol: kaynak==hedef tek elemanli yol donuyor")
+
+d = testSonuc(gecti, toplam)

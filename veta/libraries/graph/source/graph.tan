@@ -1,0 +1,290 @@
+# ============================================================
+# graph.tan — VETA Graph Core (Node/Edge, BFS/DFS/shortest-path)
+# ------------------------------------------------------------
+# VETA master prompt Graph Core tanımı: "Node, Edge, Relationship,
+# Property. Traversal: BFS, DFS, bounded traversal, shortest path,
+# pattern matching."
+#
+# DÜRÜST KAPSAM (v1): Property (kenar/düğüm özellikleri) ve pattern
+# matching KAPSAM DIŞI — sadece düğüm+yönlü/ağırlıksız kenar+traversal.
+# Bounded traversal basit bir derinlik sınırı olarak var (grafikBFSSinirli).
+#
+# NOT: `kutuphane/Grafik.tan` VAR ama o ASCII çubuk/pasta grafiği çizim
+# kütüphanesi — graph algoritması DEĞİL, isim benzerliği yanıltıcı,
+# bu core'a girdi olamaz (bkz VETA_STATUS.md).
+#
+# Yapı: g = [dugumlerHt, komsulukHt]
+#   dugumlerHt : HashTablo, dugumId -> "1" (varlık kontrolü)
+#   komsulukHt : HashTablo, dugumId -> komşu id'lerin KARAKTER(1) ile
+#     birleştirilmiş listesi (yönlü: A->B eklenince sadece A'nın
+#     komşu listesine B eklenir)
+#
+# Kullanım:
+#   içe al "veta/libraries/graph/source/graph.tan"
+#   g = grafikAc()
+#   g = grafikDugumEkle(g, "A")
+#   g = grafikDugumEkle(g, "B")
+#   g = grafikKenarEkle(g, "A", "B")
+#   komsular = grafikKomsular(g, "A")     # ["B"]
+#   sira = grafikBFS(g, "A")              # ziyaret sirasi
+#   yol = grafikEnKisaYol(g, "A", "C")    # dugum id dizisi, yoksa []
+#
+# NOT: Yeni dil özelliği/keyword EKLENMEDİ — `kayıt`/`sözlük()` KULLANILMADI
+# (TancElf'te sessizce çalışmıyor, bkz VETA_STATUS.md). HER İFADE TEK
+# SATIRDA (çok satırlı ifade sessiz parser bozulmasına yol açıyor, bkz
+# VETA_STATUS.md KRİTİK BULGU 2). `eğer X değilse` YOK, `== 0` kullanıldı.
+# ============================================================
+
+içe al "kutuphane/ozet.tan"
+içe al "kutuphane/HashTablo.tan"
+içe al "kutuphane/araclar.tan"
+
+# dizideIndeksi(dizi, aranan): lineer arama (event.tan/memory.tan ile
+# aynı yerel-kopya desen).
+işlev dizideIndeksi(dizi, aranan)
+    i = 0
+    n = uzunluk(dizi)
+    iken i < n
+        mevcut = metinBirlestir("", dizi[i])
+        eğer metinEsit(mevcut, aranan) ise
+            döndür i
+        son
+        i = i + 1
+    son
+    döndür 0 - 1
+son
+
+# dizeyeBol(icerik, ayracKarakter): icerik'i ayracKarakter'e göre
+# parçalara böler (fixed-alan varsayımı YOK, alanlarAyir'dan farklı —
+# padding/karakter(0) durdurması yok, çünkü bu HashTablo değeri, sayfa
+# içeriği değil). icerik boşsa boş dizi döner.
+işlev dizeyeBol(icerik, ayracKarakter)
+    eğer metinEsit(icerik, "") ise
+        döndür []
+    son
+    n = uzunluk(icerik)
+    parcalar = []
+    mevcut = ""
+    i = 0
+    iken i < n
+        c = metinAl(icerik, i)
+        eğer metinEsit(c, ayracKarakter) ise
+            parcalar = ekle(parcalar, mevcut)
+            mevcut = ""
+        değilse
+            mevcut = metinBirlestir(mevcut, c)
+        son
+        i = i + 1
+    son
+    parcalar = ekle(parcalar, mevcut)
+    döndür parcalar
+son
+
+# grafikAc(): boş graf kurar.
+işlev grafikAc()
+    döndür [htYeni(), htYeni()]
+son
+
+# grafikDugumEkle(g, id): düğüm ekler (zaten varsa etkisiz). YENİ g döndürür.
+işlev grafikDugumEkle(g, id)
+    dugumlerHt = htKoy(g[0], id, "1")
+    döndür [dugumlerHt, g[1]]
+son
+
+# grafikDugumVarMi(g, id): 0/1.
+işlev grafikDugumVarMi(g, id)
+    döndür htVarMi(g[0], id)
+son
+
+# grafikKenarEkle(g, kaynak, hedef): YÖNLÜ kenar ekler (kaynak->hedef).
+# Her iki düğüm de yoksa otomatik eklenir. Aynı kenar tekrar eklenirse
+# (idempotent) komşu listesinde tekrarlanmaz. YENİ g döndürür.
+işlev grafikKenarEkle(g, kaynak, hedef)
+    dugumlerHt = g[0]
+    eğer htVarMi(dugumlerHt, kaynak) == 0 ise
+        dugumlerHt = htKoy(dugumlerHt, kaynak, "1")
+    son
+    eğer htVarMi(dugumlerHt, hedef) == 0 ise
+        dugumlerHt = htKoy(dugumlerHt, hedef, "1")
+    son
+    komsulukHt = g[1]
+    mevcutListeStr = htAl(komsulukHt, kaynak)
+    komsular = dizeyeBol(mevcutListeStr, karakter(1))
+    eğer dizideIndeksi(komsular, hedef) < 0 ise
+        komsular = ekle(komsular, hedef)
+    son
+    yeniListeStr = ""
+    i = 0
+    n = uzunluk(komsular)
+    iken i < n
+        eğer i == 0 ise
+            yeniListeStr = metinBirlestir("", komsular[i])
+        değilse
+            yeniListeStr = metinBirlestir(metinBirlestir(yeniListeStr, karakter(1)), metinBirlestir("", komsular[i]))
+        son
+        i = i + 1
+    son
+    komsulukHt = htKoy(komsulukHt, kaynak, yeniListeStr)
+    döndür [dugumlerHt, komsulukHt]
+son
+
+# grafikKomsular(g, dugumId): dugumId'nin doğrudan komşularının
+# dizisini döndürür (hiç kenarı yoksa boş dizi).
+işlev grafikKomsular(g, dugumId)
+    listeStr = htAl(g[1], dugumId)
+    döndür dizeyeBol(listeStr, karakter(1))
+son
+
+# grafikBFS(g, baslangic): baslangic'tan erişilebilen TÜM düğümleri
+# BFS sırasıyla döndürür (kuyruk = dizi, "pop front" ilerleyen bir
+# indeksle simüle edilir — dizi elemanlarını silmek O(n) olurdu).
+# baslangic grafta yoksa [baslangic] döner (tek düğüm, kenar yok).
+işlev grafikBFS(g, baslangic)
+    ziyaretEdilenHt = htYeni()
+    ziyaretEdilenHt = htKoy(ziyaretEdilenHt, baslangic, "1")
+    kuyruk = [baslangic]
+    sira = []
+    okuIndeks = 0
+    iken okuIndeks < uzunluk(kuyruk)
+        guncel = kuyruk[okuIndeks]
+        okuIndeks = okuIndeks + 1
+        sira = ekle(sira, guncel)
+        komsular = grafikKomsular(g, guncel)
+        i = 0
+        n = uzunluk(komsular)
+        iken i < n
+            komsu = metinBirlestir("", komsular[i])
+            eğer htVarMi(ziyaretEdilenHt, komsu) == 0 ise
+                ziyaretEdilenHt = htKoy(ziyaretEdilenHt, komsu, "1")
+                kuyruk = ekle(kuyruk, komsu)
+            son
+            i = i + 1
+        son
+    son
+    döndür sira
+son
+
+# grafikBFSSinirli(g, baslangic, maksDerinlik): BFS ama sadece
+# maksDerinlik adıma kadar (bounded traversal). maksDerinlik=0 ise
+# sadece [baslangic] döner.
+işlev grafikBFSSinirli(g, baslangic, maksDerinlik)
+    ziyaretEdilenHt = htYeni()
+    ziyaretEdilenHt = htKoy(ziyaretEdilenHt, baslangic, "1")
+    kuyruk = [baslangic]
+    derinlikler = [0]
+    sira = []
+    okuIndeks = 0
+    iken okuIndeks < uzunluk(kuyruk)
+        guncel = kuyruk[okuIndeks]
+        guncelDerinlik = derinlikler[okuIndeks]
+        okuIndeks = okuIndeks + 1
+        sira = ekle(sira, guncel)
+        eğer guncelDerinlik < maksDerinlik ise
+            komsular = grafikKomsular(g, guncel)
+            i = 0
+            n = uzunluk(komsular)
+            iken i < n
+                komsu = metinBirlestir("", komsular[i])
+                eğer htVarMi(ziyaretEdilenHt, komsu) == 0 ise
+                    ziyaretEdilenHt = htKoy(ziyaretEdilenHt, komsu, "1")
+                    kuyruk = ekle(kuyruk, komsu)
+                    derinlikler = ekle(derinlikler, guncelDerinlik + 1)
+                son
+                i = i + 1
+            son
+        son
+    son
+    döndür sira
+son
+
+# grafikDFS(g, baslangic): baslangic'tan erişilebilen TÜM düğümleri
+# DFS sırasıyla döndürür (yığın = dizi, sondan ekle/çıkar).
+işlev grafikDFS(g, baslangic)
+    ziyaretEdilenHt = htYeni()
+    yigin = [baslangic]
+    sira = []
+    iken uzunluk(yigin) > 0
+        sonIndeks = uzunluk(yigin) - 1
+        guncel = yigin[sonIndeks]
+        yeniYigin = []
+        i = 0
+        iken i < sonIndeks
+            yeniYigin = ekle(yeniYigin, metinBirlestir("", yigin[i]))
+            i = i + 1
+        son
+        yigin = yeniYigin
+        eğer htVarMi(ziyaretEdilenHt, guncel) == 0 ise
+            ziyaretEdilenHt = htKoy(ziyaretEdilenHt, guncel, "1")
+            sira = ekle(sira, guncel)
+            komsular = grafikKomsular(g, guncel)
+            i = 0
+            n = uzunluk(komsular)
+            iken i < n
+                komsu = metinBirlestir("", komsular[i])
+                eğer htVarMi(ziyaretEdilenHt, komsu) == 0 ise
+                    yigin = ekle(yigin, komsu)
+                son
+                i = i + 1
+            son
+        son
+    son
+    döndür sira
+son
+
+# grafikEnKisaYol(g, kaynak, hedef): BFS ile en kısa (ağırlıksız) yolu
+# bulur, düğüm id'lerinin dizisini (kaynak'tan hedef'e) döndürür.
+# Yol yoksa boş dizi döner. kaynak==hedef ise [kaynak] döner.
+işlev grafikEnKisaYol(g, kaynak, hedef)
+    eğer metinEsit(kaynak, hedef) ise
+        döndür [kaynak]
+    son
+    ziyaretEdilenHt = htYeni()
+    ziyaretEdilenHt = htKoy(ziyaretEdilenHt, kaynak, "1")
+    ebeveynHt = htYeni()
+    kuyruk = [kaynak]
+    okuIndeks = 0
+    bulunduMu = 0
+    iken okuIndeks < uzunluk(kuyruk) ve bulunduMu == 0
+        guncel = kuyruk[okuIndeks]
+        okuIndeks = okuIndeks + 1
+        komsular = grafikKomsular(g, guncel)
+        i = 0
+        n = uzunluk(komsular)
+        iken i < n ve bulunduMu == 0
+            komsu = metinBirlestir("", komsular[i])
+            eğer htVarMi(ziyaretEdilenHt, komsu) == 0 ise
+                ziyaretEdilenHt = htKoy(ziyaretEdilenHt, komsu, "1")
+                ebeveynHt = htKoy(ebeveynHt, komsu, guncel)
+                kuyruk = ekle(kuyruk, komsu)
+                eğer metinEsit(komsu, hedef) ise
+                    bulunduMu = 1
+                son
+            son
+            i = i + 1
+        son
+    son
+    eğer bulunduMu == 0 ise
+        döndür []
+    son
+    tersYol = [hedef]
+    izleyen = hedef
+    iken metinEsit(izleyen, kaynak) == 0
+        ebeveyn = htAl(ebeveynHt, izleyen)
+        tersYol = ekle(tersYol, ebeveyn)
+        izleyen = ebeveyn
+    son
+    n = uzunluk(tersYol)
+    yol = []
+    i = n - 1
+    iken i >= 0
+        yol = ekle(yol, tersYol[i])
+        i = i - 1
+    son
+    döndür yol
+son
+
+# grafikDugumSayisi(g): toplam düğüm sayısı (HashTablo eleman sayısı
+# doğrudan okunamadığı için burada AYRI bir sayaç TUTULMUYOR — bu
+# fonksiyon KULLANILMAZ, bkz not). NOT: v1'de düğüm sayısı sorgusu
+# kapsam dışı bırakıldı (HashTablo.tan boyut API'si yok); gerekirse
+# çağıran kendi dugumlerHt için ayrı bir sayaç tutabilir.

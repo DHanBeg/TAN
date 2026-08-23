@@ -303,7 +303,15 @@ başlanmadı) + Isolation/2D (tek-thread sınırı hâlâ geçerli).
   düştüm yazarken (`eğer ... değilse` "ise" olmadan) — kendi kendine
   probe testiyle (cascade-parse kontrolü) yazımdan hemen sonra yakalayıp
   düzelttim, öğrenilen dersin işe yaradığı doğrulandı.
-- **Durum:** Storage+Query+Event+Memory+Security+Temporal+Observability bitti (tek-node, eşzamanlılık yok). Sıradaki: Central Core veya Distributed/Semantic/Graph/AI Memory/Optimizer/Plugin/Autonomy/Evolution (hepsi sıfır kod).
+- **Graph core** ✅ TAMAMLANDI (2026-08-23) — `veta/libraries/graph/source/graph.tan`.
+  `grafikAc/grafikDugumEkle/grafikDugumVarMi/grafikKenarEkle/grafikKomsular/
+  grafikBFS/grafikBFSSinirli/grafikDFS/grafikEnKisaYol`. Yönlü, ağırlıksız
+  kenar. BFS ile en kısa yol (ağırlıksız grafta doğru), bounded traversal
+  (derinlik sınırlı BFS). Property/pattern-matching KAPSAM DIŞI (dürüst).
+  `kutuphane/Grafik.tan` (ASCII chart, graph algoritması DEĞİL)
+  KULLANILMADI. Test: `veta/tests/test_graph.tan` (eski smoke-stub
+  değiştirildi) — 17/17 GEÇTİ (WSL native).
+- **Durum:** Storage+Query+Event+Memory+Security+Temporal+Observability+Graph bitti (tek-node, eşzamanlılık yok). Sıradaki: Central Core veya Distributed/Semantic/AI Memory/Optimizer/Plugin/Autonomy/Evolution (hepsi sıfır kod).
 
 ## Sonraki Adımlar
 
