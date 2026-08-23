@@ -201,10 +201,24 @@ başlanmadı) + Isolation/2D (tek-thread sınırı hâlâ geçerli).
 ## Faz 7 — VETA Core Detaylı Uygulama (devam ediyor)
 
 ### Kural: Detaylı implementasyonlar reel donanımda başlatılabilir.
-- **Event sistemleri, distributed sistemler:** Observer pattern, message passing
-- **Graph, semantic:** Graph yapıları ve algoritmaları (BFS/DFS), semantic kavramlar ve ontolojiler — graph.tan ve semantic.tan; test: test_graph.tan, test_semantic.tan
-- **ai_memory, observability, optimizer, plugin, autonomy, evolution:** TAN native struct'lar ve algoritmalar (Faz 7 için ayrılmıştır)
-- **Durum:** HAZIRLANIYOR — 2D eşzamanlılık zemini gereklidir (Faz 5'ten bağımlı); F6 implementasyonu Storage+Query+Event tamamlandığında başlayabilir
+- **Event sistemleri** ✅ TAMAMLANDI (2026-08-23) — `veta/libraries/concurrency/source/event.tan`.
+  Gerçek callback/observer YAPILAMAZ (TAN native ELF'te fonksiyon-değeri yok,
+  doğrulandı) — bunun yerine **polling modeli**: `eventSistemiYeni/
+  eventAboneOl/eventAboneKaldir/eventAboneVarMi/eventOlustur/eventSonId/
+  eventYayinla/eventAl`. Abone taraf `eventAl(sistem, tip)` ile kendi çeker.
+  Test: `veta/tests/test_event.tan` — 10/10 GEÇTİ (WSL native), iç içe dizi
+  mutasyonu (`kayit[5]=1` — olayListesi[i] elemanının alanını değiştirme)
+  kritik test edildi ve ÇALIŞTIĞI doğrulandı (TAN referans semantiği bu
+  durumda mutable). `distributed sistem` (spread_event/NodeId) kısmı bu
+  turda YAZILMADI — tek-node polling event bus bitti, distributed kısmı ayrı iş.
+- **Distributed sistemler:** (event.tan'ın distributed bölümü hariç) başlanmadı.
+- **Graph, semantic:** Graph yapıları ve algoritmaları (BFS/DFS), semantic kavramlar ve ontolojiler — graph.tan ve semantic.tan; test: test_graph.tan, test_semantic.tan. Not: `kutuphane/Grafik.tan` VAR ama o ASCII çubuk/chart çizim kütüphanesi, graph algoritması DEĞİL — isim benzerliği yanıltıcı, VETA Graph core'una girdi olamaz.
+- **ai_memory, observability, optimizer, plugin, autonomy, evolution:** TAN native struct'lar ve algoritmalar (Faz 7 için ayrılmıştır). Not: `kutuphane/Yapayzeka.tan` VAR ama o dış LLM API çağırma yardımcı fonksiyonu (soruSor), "AI memory" (embedding/vector store) değil.
+- **Memory core (bellek/buffer core, "ham bellek" 2C ile KARIŞTIRILMASIN):** başlanmadı. Not: `kutuphane/AdaptiveCache.tan` (LFU+RLE cache, NEXUS hattı) var ama VETA Memory core'a bağlanmadı, doğrulanmadı.
+- **Security core:** başlanmadı. `kutuphane/sha256.tan`/`tls.tan` dil-seviyesi kripto kütüphanesi, VETA Security core'a bağlanmadı.
+- **Temporal core:** VETA'da başlanmadı. `kutuphane/TemporalEngine.tan` (NEXUS Katman 3, versiyonlama) var ama `LsmDeposu.tan` üzerine kurulu — VETA'nın PageManager hattına bağlı DEĞİL, doğrulanmadı.
+- **2D eşzamanlılık:** hâlâ SELF katmanında YOK (derleyici-seviyesi iş — futex/thread/lock/atomik codegen TancElf.tan'a hiç eklenmedi, eski Go backend'deki `icParcaLat`/DerleElf.go implementasyonu Go-removal'da silindi, self-hosted derleyiciye taşınmadı). Yüksek risk, ayrı dikkatli oturum gerektirir.
+- **Durum:** Storage+Query+Event bitti (tek-node, eşzamanlılık yok). Sıradaki: Memory core veya Security core (ikisi de kütüphane-seviyesi, derleyiciye dokunmuyor, düşük risk).
 
 ## Sonraki Adımlar
 

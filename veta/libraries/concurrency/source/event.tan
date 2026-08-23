@@ -93,3 +93,174 @@
 # - Tüm abonelikleri temizleme
 # - Olay deque'ini boşaltma
 # - System durumunun "kapalı" olarak işaretlenmesi
+
+# ============================================================
+# Uygulama — POLLING (pull) modeli
+# ------------------------------------------------------------
+# BİLİNEN TAN SINIRI (doğrulandı, bkz NexusCore/TanDurum.md):
+# native ELF derleyicide fonksiyon-degeri/callback YOK. Bu yüzden
+# klasik observer ("abone fonksiyonunu cagirma") YAPILAMAZ. Bunun
+# yerine POLLING modeli: abone olan taraf periyodik olarak
+# eventAl(sistem, tip) cagirip kendisine gelen event'leri KENDI
+# CEKER (push/callback degil, pull/polling).
+#
+# Event kaydı: [eventId, tip, kaynak, hedef, veri, durum]
+#   eventId : artan tam sayı (sayaç)
+#   tip     : 0=BASIC, 1=CRITICAL, 2=WARNING, 3=INFO, 4=DEBUG
+#   kaynak  : metin (kaynak entity_id)
+#   hedef   : metin (hedef entity_id)
+#   veri    : metin (serbest format)
+#   durum   : 0=Bekliyor, 1=Yayınlandı, 2=Alındı
+#
+# Sistem: [aboneKovalari, olayListesi, sayacKutu]
+#   aboneKovalari : 5 elemanlı dizi, index = event tipi (0-4);
+#                   her eleman o tip için abone entity_id metin listesi
+#   olayListesi   : TÜM event kayıtlarının dizisi
+#   sayacKutu     : [1] mutable kutu — bir sonraki eventId
+#
+# NOT: Yeni dil özelliği/keyword EKLENMEDİ — sadece mevcut TAN
+# dili (işlev/eğer/iken/döndür) kullanıldı (proje kuralı).
+# Dizi elemanı metinler karşılaştırılmadan/kopyalanmadan önce
+# metinBirlestir("", x) ile metin bağlamına alınır (TancElf bilinen
+# sınırı, bkz kutuphane/HashTablo.tan başındaki not).
+# Immutable stil: abone/olay listesi değişince YENİ sistem döner
+# (bkz HashTablo.tan htKoy/htSil desenleri); çağıran atamayı
+# güncellemeli. sayacKutu ve kayıt alanları (dizi[i]=x) mutable'dır,
+# yerinde değişir (bkz query.tan'daki kutu kalıbı).
+# ============================================================
+
+# dizideIndeksi(dizi, aranan): metin dizisinde lineer arama
+# (htKovaIndeksi desenindeki yardımcı). Bulunursa indeks,
+# bulunmazsa 0 - 1 döndürür.
+işlev dizideIndeksi(dizi, aranan)
+    i = 0
+    n = uzunluk(dizi)
+    iken i < n
+        mevcut = metinBirlestir("", dizi[i])
+        eğer metinEsit(mevcut, aranan) ise
+            döndür i
+        son
+        i = i + 1
+    son
+    döndür 0 - 1
+son
+
+# eventSistemiYeni(): boş event sistemi kurar.
+# Döner: [aboneKovalari(5 bos kova), [], [1]]
+işlev eventSistemiYeni()
+    aboneKovalari = []
+    i = 0
+    iken i < 5
+        aboneKovalari = ekle(aboneKovalari, [])
+        i = i + 1
+    son
+    döndür [aboneKovalari, [], [1]]
+son
+
+# eventAboneOl(sistem, tip, entityId): entityId'i tip kovasına
+# ekler (tekrar eklemeyi engeller), YENİ sistem döndürür.
+# Kullanım: sistem = eventAboneOl(sistem, tip, id)
+işlev eventAboneOl(sistem, tip, entityId)
+    aboneKovalari = sistem[0]
+    kova = aboneKovalari[tip]
+    idx = dizideIndeksi(kova, entityId)
+    eğer idx < 0 ise
+        kova = ekle(kova, entityId)
+        aboneKovalari[tip] = kova
+    son
+    döndür [aboneKovalari, sistem[1], sistem[2]]
+son
+
+# eventAboneKaldir(sistem, tip, entityId): entityId'i tip kovasından
+# çıkarır (idx dışındakiler yeni diziye kopyalanır — htSil deseni),
+# YENİ sistem döndürür. Abone zaten yoksa sistemi olduğu gibi döndürür.
+işlev eventAboneKaldir(sistem, tip, entityId)
+    aboneKovalari = sistem[0]
+    kova = aboneKovalari[tip]
+    idx = dizideIndeksi(kova, entityId)
+    eğer idx < 0 ise
+        döndür sistem
+    son
+    yeniKova = []
+    i = 0
+    n = uzunluk(kova)
+    iken i < n
+        eğer i != idx ise
+            yeniKova = ekle(yeniKova, metinBirlestir("", kova[i]))
+        son
+        i = i + 1
+    son
+    aboneKovalari[tip] = yeniKova
+    döndür [aboneKovalari, sistem[1], sistem[2]]
+son
+
+# eventAboneVarMi(sistem, tip, entityId): entityId tip kovasında
+# kayıtlıysa 1, değilse 0 döndürür.
+işlev eventAboneVarMi(sistem, tip, entityId)
+    döndür dizideIndeksi(sistem[0][tip], entityId) >= 0
+son
+
+# eventOlustur(sistem, tip, kaynak, hedef, veri): yeni event kaydını
+# (eventId = sayaç, durum = 0 Bekliyor) olayListesi'ne ekler, YENİ
+# sistem döndürür (olayListesi değişti — çağıran atamayı güncellemeli).
+# sayacKutu mutable kutu olduğu için eventId doğrudan yerinde artırılır.
+işlev eventOlustur(sistem, tip, kaynak, hedef, veri)
+    eventId = sistem[2][0]
+    sistem[2][0] = eventId + 1
+    kayit = [eventId, tip, kaynak, hedef, veri, 0]
+    olayListesi = ekle(sistem[1], kayit)
+    döndür [sistem[0], olayListesi, sistem[2]]
+son
+
+# eventSonId(sistem): en son oluşturulan event'in eventId'sini
+# döndürür (eventOlustur tek değer döndürdüğü için id bu yolla alınır).
+# Boş listede 0 - 1 döner.
+# Kullanım: sistem = eventOlustur(...); id = eventSonId(sistem)
+işlev eventSonId(sistem)
+    olayListesi = sistem[1]
+    n = uzunluk(olayListesi)
+    eğer n == 0 ise
+        döndür 0 - 1
+    son
+    kayit = olayListesi[n - 1]
+    döndür kayit[0]
+son
+
+# eventYayinla(sistem, eventId): eventId'li kaydın durumunu
+# 1 (Yayınlandı) yapar, sistemi döndürür. Kayıt bulunamazsa sistemi
+# olduğu gibi döndürür.
+işlev eventYayinla(sistem, eventId)
+    olayListesi = sistem[1]
+    n = uzunluk(olayListesi)
+    i = 0
+    iken i < n
+        kayit = olayListesi[i]
+        eğer kayit[0] == eventId ise
+            kayit[5] = 1
+            döndür sistem
+        son
+        i = i + 1
+    son
+    döndür sistem
+son
+
+# eventAl(sistem, tip): tip'i eşleşen VE durumu 1 (Yayınlandı) olan
+# TÜM kayıtları yeni bir dizide toplar, her birinin durumunu
+# 2 (Alındı) yapar (yerinde mutasyon — kayıtlar dizi içinde mutable;
+# dizi[i]=x kalıcılığı query.tan/HashTablo.tan desenlerinde ispatlı)
+# ve toplanan listeyi döndürür. Abone tarafın polling çekme adımı.
+işlev eventAl(sistem, tip)
+    olayListesi = sistem[1]
+    toplanan = []
+    n = uzunluk(olayListesi)
+    i = 0
+    iken i < n
+        kayit = olayListesi[i]
+        eğer kayit[1] == tip ve kayit[5] == 1 ise
+            kayit[5] = 2
+            toplanan = ekle(toplanan, kayit)
+        son
+        i = i + 1
+    son
+    döndür toplanan
+son

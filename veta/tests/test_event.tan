@@ -1,13 +1,66 @@
-# test_event.tan — VETA Event Sistemi smoke test
-# Kompilasyon: qemu-x86_64 TancElf <bu_dosya> <cikti>
-# Çalıştırma:  qemu-x86_64 <cikti>
-# Kural: mevcut TancElf binary'sini kullan; Faz 6 zemini (Storage + Query + Transaction + Event hazır); QEMU throttle toleranı.
+# test_event.tan — VETA Event (eventSistemiYeni/eventAboneOl/eventOlustur/
+# eventYayinla/eventAl) testleri. Polling modeli (callback yok, bkz event.tan).
 
+içe al "kutuphane/test.tan"
 içe al "../libraries/concurrency/source/event.tan"
 
-# Basit event testi
-yaz("Event Sistemi Testi: Olay yayınlama mekanizması aktive edildi\n")
-yaus("Event tipi: BASİC\n")
-yaus("Aktif abone sayısı: ")
-yaus(aktif_abone_sayisi(BASİC))
-yaz("\n")
+gecti = 0
+toplam = 0
+
+sistem = eventSistemiYeni()
+
+# abonelik
+sistem = eventAboneOl(sistem, 1, "worker-1")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, eventAboneVarMi(sistem, 1, "worker-1"), "eventAboneOl: abone kaydedildi")
+
+# tekrar abone olma - kova buyumemeli
+sistem = eventAboneOl(sistem, 1, "worker-1")
+
+# event olustur
+sistem = eventOlustur(sistem, 1, "kaynakA", "hedefB", "merhaba")
+id1 = eventSonId(sistem)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, id1, "eventOlustur: ilk event id=1 (sayac 1'den basliyor)")
+
+# henuz yayinlanmadi - eventAl bos donmeli
+alinan0 = eventAl(sistem, 1)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, uzunluk(alinan0), "eventAl: yayinlanmamis event donmuyor")
+
+# yayinla
+sistem = eventYayinla(sistem, id1)
+
+# simdi eventAl bu event'i donmeli (KRITIK TEST: ic ice dizi mutasyonu calisiyor mu)
+alinan1 = eventAl(sistem, 1)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, uzunluk(alinan1), "eventAl: yayinlanan event donuyor (mutasyon calisti)")
+
+kayit1 = alinan1[0]
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("kaynakA", metinBirlestir("", kayit1[2]), "eventAl: donen kaydin kaynak alani dogru")
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("merhaba", metinBirlestir("", kayit1[4]), "eventAl: donen kaydin veri alani dogru")
+
+# ikinci kez eventAl cagirinca ayni event TEKRAR donmemeli (durum artik 2=Alindi)
+alinan2 = eventAl(sistem, 1)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, uzunluk(alinan2), "eventAl: alinan event ikinci kez donmuyor (durum=2 kalici)")
+
+# farkli tip icin bos donmeli
+sistem = eventOlustur(sistem, 3, "x", "y", "info-mesaji")
+id2 = eventSonId(sistem)
+sistem = eventYayinla(sistem, id2)
+alinanYanlisTip = eventAl(sistem, 1)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, uzunluk(alinanYanlisTip), "eventAl: farkli tip'teki event karismiyor")
+alinanDogruTip = eventAl(sistem, 3)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, uzunluk(alinanDogruTip), "eventAl: tip 3 kendi event'ini buluyor")
+
+# abonelikten cikar
+sistem = eventAboneKaldir(sistem, 1, "worker-1")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, eventAboneVarMi(sistem, 1, "worker-1"), "eventAboneKaldir: abone kaldirildi")
+
+d = testSonuc(gecti, toplam)
