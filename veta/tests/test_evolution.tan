@@ -1,0 +1,82 @@
+# test_evolution.tan — VETA Evolution Core testleri.
+# candidate->experiment->benchmark->shadow->canary->promotion/rollback,
+# "production'a dogrudan yazamaz" ilkesinin zorlanmasi dahil.
+
+içe al "kutuphane/test.tan"
+içe al "../libraries/evolution/source/evolution.tan"
+
+gecti = 0
+toplam = 0
+
+e = evrimAc()
+e = evrimAdayOner(e, "yeni-index-algoritmasi", "B+Tree yerine LSM dene")
+id1 = evrimSonId(e)
+
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, evrimDurum(e, id1), "evrimAdayOner: yeni aday ADAY(0)")
+
+# KRITIK: aday durumundan DOGRUDAN yayinlama denenirse RED edilmeli
+e = evrimYayinla(e, id1)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, evrimDurum(e, id1), "evrimYayinla: aday durumundan dogrudan yayinlama reddedildi, hala ADAY(0)")
+
+e = evrimDeneyeBaslat(e, id1)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, evrimDurum(e, id1), "evrimDeneyeBaslat: 0->1 DENEY")
+
+# hala erken - yayinlama yine reddedilmeli
+e = evrimYayinla(e, id1)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, evrimDurum(e, id1), "evrimYayinla: deney asamasindan da reddediliyor, hala DENEY(1)")
+
+e = evrimKiyaslamaTamamla(e, id1, 1)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(2, evrimDurum(e, id1), "evrimKiyaslamaTamamla: basarili 1->2 KIYASLANDI")
+
+e = evrimGolgeyeAl(e, id1)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(3, evrimDurum(e, id1), "evrimGolgeyeAl: 2->3 GOLGE")
+
+e = evrimCanaryBaslat(e, id1)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(4, evrimDurum(e, id1), "evrimCanaryBaslat: 3->4 CANARY")
+
+# SIMDI yayinlama calismali
+e = evrimYayinla(e, id1)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(5, evrimDurum(e, id1), "evrimYayinla: canary sonrasi 4->5 YAYINLANDI")
+
+# yayinlandiktan sonra geri alma etkisiz olmali (son durum)
+e = evrimGeriAl(e, id1)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(5, evrimDurum(e, id1), "evrimGeriAl: yayinlanmis aday etkilenmiyor, hala YAYINLANDI(5)")
+
+# ikinci aday - kiyaslama basarisiz -> otomatik rollback
+e = evrimAdayOner(e, "riskli-degisiklik", "test")
+id2 = evrimSonId(e)
+e = evrimDeneyeBaslat(e, id2)
+e = evrimKiyaslamaTamamla(e, id2, 0)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(6, evrimDurum(e, id2), "evrimKiyaslamaTamamla: basarisiz 1->6 GERI_ALINDI")
+
+# ucuncu aday - golge asamasinda acil durdurma
+e = evrimAdayOner(e, "baska-deney", "test2")
+id3 = evrimSonId(e)
+e = evrimDeneyeBaslat(e, id3)
+e = evrimKiyaslamaTamamla(e, id3, 1)
+e = evrimGolgeyeAl(e, id3)
+e = evrimGeriAl(e, id3)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(6, evrimDurum(e, id3), "evrimGeriAl: golge asamasinda acil durdurma calisti, GERI_ALINDI(6)")
+
+# henuz denenmemis (ADAY durumunda) bir aday icin geri alma etkisiz
+e = evrimAdayOner(e, "dokunulmamis", "test3")
+id4 = evrimSonId(e)
+e = evrimGeriAl(e, id4)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, evrimDurum(e, id4), "evrimGeriAl: hic denenmemis aday etkilenmiyor, hala ADAY(0)")
+
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(4, evrimAdaySayisi(e), "evrimAdaySayisi: toplam 4 aday")
+
+d = testSonuc(gecti, toplam)

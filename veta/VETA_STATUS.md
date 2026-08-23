@@ -419,7 +419,20 @@ başlanmadı) + Isolation/2D (tek-thread sınırı hâlâ geçerli).
   yürütme (dynamic dispatch, TAN'da fonksiyon-değeri yok) KAPSAM DIŞI —
   Central/Plugin core'larla aynı sınır. Test:
   `veta/tests/test_autonomy.tan` — 14/14 GEÇTİ (WSL native).
-- **Durum:** Storage+Query+Event+Memory+Security+Temporal+Observability+Graph+Semantic+AI Memory+Central Core+Optimizer+Plugin+Autonomy bitti (tek-node, eşzamanlılık yok, float fonksiyonlar bozuk, dinamik dispatch yok). Sıradaki: Distributed/Evolution (hepsi sıfır kod).
+- **Evolution core** ✅ TAMAMLANDI (2026-08-23) — `veta/libraries/evolution/source/evolution.tan`.
+  `evrimAc/evrimAdayOner/evrimSonId/evrimDurum/evrimDeneyeBaslat/
+  evrimKiyaslamaTamamla/evrimGolgeyeAl/evrimCanaryBaslat/evrimYayinla/
+  evrimGeriAl/evrimAdaySayisi`. Durum makinesi: ADAY(0)→DENEY(1)→
+  [KIYASLANDI(2)|GERI_ALINDI(6)]→GOLGE(3)→CANARY(4)→[YAYINLANDI(5)
+  promotion|GERI_ALINDI(6)]. **"Evolution production'a doğrudan
+  yazamaz" ilkesi gerçekten zorlanıyor:** `evrimYayinla` SADECE
+  durum=4(CANARY) ise çalışır — Candidate'ten doğrudan Promotion'a
+  ASLA atlanamaz (test edildi: ADAY ve DENEY aşamalarından iki ayrı
+  yayınlama denemesi de reddedildi). `evrimGeriAl` herhangi bir aktif
+  aşamadan (1/2/3/4) acil durdurma yapabiliyor. Gerçek deney/kıyaslama/
+  gölge-trafik çalıştırma KAPSAM DIŞI (SIMULATE sınırıyla tutarlı).
+  Test: `veta/tests/test_evolution.tan` — 13/13 GEÇTİ (WSL native).
+- **Durum:** 15/16 core'da gerçek kod var — Storage+Query+Event+Memory+Security+Temporal+Observability+Graph+Semantic+AI Memory+Central Core+Optimizer+Plugin+Autonomy+Evolution (tek-node, eşzamanlılık yok, float fonksiyonlar bozuk, dinamik dispatch yok). Sıradaki (SON core): Distributed. Kalan: Frontend (kısmi iskelet var, doğrulanmadı), 2D eşzamanlılık (derleyici işi, ayrı).
 
 ## Sonraki Adımlar
 

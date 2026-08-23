@@ -1,0 +1,169 @@
+# ============================================================
+# evolution.tan — VETA Evolution Core (candidate->experiment->benchmark
+# ->shadow->canary->promotion/rollback)
+# ------------------------------------------------------------
+# VETA master prompt Evolution Core tanımı: "EN SON. Candidate ->
+# Experiment -> Benchmark -> Shadow -> Canary -> Promotion -> Rollback.
+# Evolution production'a doğrudan yazamaz."
+#
+# DÜRÜST KAPSAM (v1): Gerçek deney/kıyaslama/gölge-trafik ÇALIŞTIRMA
+# YOK — TAN'da paralel süreç/network mirroring yok (Autonomy/Optimizer
+# core'lardaki SIMULATE sınırıyla tutarlı). Bu core SADECE aşama
+# geçişlerinin DOĞRU SIRAYLA ve ATLANMADAN yapılmasını garanti eder.
+# Bu core'un asıl katkısı — "Evolution production'a DOĞRUDAN yazamaz"
+# ilkesi: `evrimYayinla` (production'a yazma izni) SADECE tüm ara
+# aşamalardan (Experiment, Benchmark, Shadow, Canary) SIRAYLA geçmiş
+# bir aday için çalışır — Candidate'ten doğrudan Promotion'a ASLA
+# atlanamaz (Autonomy Core'daki "kontrolsüz mutation yasak" ile aynı
+# felsefe, durum makinesi ile ÇALIŞMA-ZAMANI garantili).
+#
+# Durum makinesi:
+#   0 ADAY(candidate) -> 1 DENEY(experiment) -> [2 KIYASLANDI(benchmark) | 6 GERI_ALINDI]
+#   2 KIYASLANDI -> 3 GOLGE(shadow) -> 4 CANARY -> [5 YAYINLANDI(promoted) | 6 GERI_ALINDI]
+#   1/2/3/4 durumlarının HERHANGİ BİRİNDEN 6(GERI_ALINDI)'ya acil
+#   duruş/rollback yapılabilir (herhangi bir aşamada sorun bulunursa).
+#   6 ve 5 SON durumlardır, geri dönüş yok.
+#
+# Yapı: e = [adaylarListesi, adayIndeksHt]
+#   adaylarListesi : dizi [id, ad, aciklama, durum]
+#   adayIndeksHt   : HashTablo, id(metin) -> adaylarListesi indeksi
+#
+# Kullanım:
+#   içe al "veta/libraries/evolution/source/evolution.tan"
+#   e = evrimAc()
+#   e = evrimAdayOner(e, "yeni-index-algoritmasi", "B+Tree yerine LSM dene")
+#   id = evrimSonId(e)
+#   e = evrimDeneyeBaslat(e, id)                # 0->1
+#   e = evrimKiyaslamaTamamla(e, id, 1)          # 1->2 (basariliysa)
+#   e = evrimGolgeyeAl(e, id)                    # 2->3
+#   e = evrimCanaryBaslat(e, id)                 # 3->4
+#   e = evrimYayinla(e, id)                      # SADECE 4->5
+#
+# NOT: Yeni dil özelliği/keyword EKLENMEDİ. `kayıt`/`sözlük()` KULLANILMADI.
+# HER İFADE TEK SATIRDA, `eğer X değilse` YOK (== 0) — bkz KRİTİK BULGU 2.
+# Float YOK (bkz KRİTİK BULGU 3).
+# ============================================================
+
+içe al "kutuphane/ozet.tan"
+içe al "kutuphane/HashTablo.tan"
+içe al "kutuphane/araclar.tan"
+
+# evrimAc(): boş Evolution Core bağlamı kurar.
+işlev evrimAc()
+    döndür [[], htYeni()]
+son
+
+# evrimAdayOner(e, ad, aciklama): "Candidate" — yeni bir evrim adayı
+# kaydeder (durum=0 ADAY). YENİ e döndürür.
+işlev evrimAdayOner(e, ad, aciklama)
+    adaylarListesi = e[0]
+    id = uzunluk(adaylarListesi) + 1
+    kayit = [id, ad, aciklama, 0]
+    adaylarListesi = ekle(adaylarListesi, kayit)
+    indeksHt = htKoy(e[1], metin(id), metin(uzunluk(adaylarListesi) - 1))
+    döndür [adaylarListesi, indeksHt]
+son
+
+# evrimSonId(e): en son önerilen adayın id'sini döndürür.
+işlev evrimSonId(e)
+    adaylarListesi = e[0]
+    n = uzunluk(adaylarListesi)
+    eğer n == 0 ise
+        döndür 0 - 1
+    son
+    sonKayit = adaylarListesi[n - 1]
+    döndür sonKayit[0]
+son
+
+# evrimDurum(e, id): adayın durumunu döndürür, bulunamazsa 0-1.
+işlev evrimDurum(e, id)
+    indeksStr = htAl(e[1], metin(id))
+    eğer metinEsit(indeksStr, "") ise
+        döndür 0 - 1
+    son
+    indeks = metneTam(indeksStr)
+    adaylarListesi = e[0]
+    kayit = adaylarListesi[indeks]
+    döndür kayit[3]
+son
+
+# evrimGecisYap(e, id, beklenenOncekiDurum, yeniDurum): İÇ yardımcı —
+# durum SADECE beklenenOncekiDurum ise yeniDurum'a geçer (Plugin/
+# Autonomy core'larla aynı desen).
+işlev evrimGecisYap(e, id, beklenenOncekiDurum, yeniDurum)
+    indeksStr = htAl(e[1], metin(id))
+    eğer metinEsit(indeksStr, "") ise
+        döndür e
+    son
+    indeks = metneTam(indeksStr)
+    adaylarListesi = e[0]
+    kayit = adaylarListesi[indeks]
+    eğer kayit[3] == beklenenOncekiDurum ise
+        kayit[3] = yeniDurum
+    son
+    döndür e
+son
+
+# evrimDeneyeBaslat(e, id): "Experiment" — 0(ADAY) -> 1(DENEY).
+işlev evrimDeneyeBaslat(e, id)
+    döndür evrimGecisYap(e, id, 0, 1)
+son
+
+# evrimKiyaslamaTamamla(e, id, basariliMi): "Benchmark" — 1(DENEY)
+# durumundaki aday: basariliMi=1 ise 2(KIYASLANDI)'ya, 0 ise
+# 6(GERI_ALINDI)'ya geçer (kıyaslama başarısızsa evrim burada durur).
+işlev evrimKiyaslamaTamamla(e, id, basariliMi)
+    eğer basariliMi == 1 ise
+        döndür evrimGecisYap(e, id, 1, 2)
+    son
+    döndür evrimGecisYap(e, id, 1, 6)
+son
+
+# evrimGolgeyeAl(e, id): "Shadow" — 2(KIYASLANDI) -> 3(GOLGE).
+işlev evrimGolgeyeAl(e, id)
+    döndür evrimGecisYap(e, id, 2, 3)
+son
+
+# evrimCanaryBaslat(e, id): "Canary" — 3(GOLGE) -> 4(CANARY).
+işlev evrimCanaryBaslat(e, id)
+    döndür evrimGecisYap(e, id, 3, 4)
+son
+
+# evrimYayinla(e, id): "Promotion" — SADECE 4(CANARY) durumundaki bir
+# aday 5(YAYINLANDI)'ya geçebilir. Bu, "Evolution production'a
+# DOĞRUDAN yazamaz" ilkesinin çalışma-zamanı garantisidir: Deney,
+# Kıyaslama, Gölge, Canary aşamalarının HEPSİNDEN geçmemiş bir aday
+# ASLA yayınlanamaz. GERÇEK production yazımını bu fonksiyon YAPMAZ
+# (TAN'da dinamik çağrı yok) — çağıran GERÇEK değişikliği kendisi
+# uygulayıp SONRA bu fonksiyonu çağırır.
+işlev evrimYayinla(e, id)
+    döndür evrimGecisYap(e, id, 4, 5)
+son
+
+# evrimGeriAl(e, id): "Rollback" — 1(DENEY), 2(KIYASLANDI), 3(GOLGE)
+# veya 4(CANARY) durumlarının HERHANGİ BİRİNDEN acil durarak
+# 6(GERI_ALINDI)'ya geçer (herhangi bir aşamada sorun bulunursa hemen
+# durdurma). 0(ADAY) veya zaten son durumdaki (5/6) bir aday için
+# etkisizdir (henüz hiçbir şey denenmemiş bir adayı "geri almanın"
+# anlamı yok, ve son durumlar değişmez).
+işlev evrimGeriAl(e, id)
+    mevcutDurum = evrimDurum(e, id)
+    eğer mevcutDurum == 1 ise
+        döndür evrimGecisYap(e, id, 1, 6)
+    son
+    eğer mevcutDurum == 2 ise
+        döndür evrimGecisYap(e, id, 2, 6)
+    son
+    eğer mevcutDurum == 3 ise
+        döndür evrimGecisYap(e, id, 3, 6)
+    son
+    eğer mevcutDurum == 4 ise
+        döndür evrimGecisYap(e, id, 4, 6)
+    son
+    döndür e
+son
+
+# evrimAdaySayisi(e): toplam aday sayısı (durumu ne olursa olsun).
+işlev evrimAdaySayisi(e)
+    döndür uzunluk(e[0])
+son
