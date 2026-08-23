@@ -40,5 +40,41 @@ degerYok = sorguSec(baglam, "olmayan")
 toplam = toplam + 1
 gecti = gecti + iddiaMetin("", degerYok, "sorguSec: olmayan key bos metin donduruyor")
 
+# UPDATE
+z = sorguGuncelle(baglam, "ad", "demirhan")
+degerGuncel = sorguSec(baglam, "ad")
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("demirhan", degerGuncel, "sorguGuncelle: mevcut key guncelleniyor")
+degerSehirHala = sorguSec(baglam, "sehir")
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("istanbul", degerSehirHala, "sorguGuncelle: baska key etkilenmiyor")
+
+# UPDATE (upsert - olmayan key)
+z = sorguGuncelle(baglam, "yeni", "deger")
+degerYeni = sorguSec(baglam, "yeni")
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("deger", degerYeni, "sorguGuncelle: olmayan key icin upsert calisiyor")
+
+# DELETE
+silSonuc = sorguSil(baglam, "sehir")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, silSonuc, "sorguSil: mevcut key siliniyor, 1 donuyor")
+degerSilinen = sorguSec(baglam, "sehir")
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("", degerSilinen, "sorguSil: silinen key artik bulunamiyor")
+silSonucYok = sorguSil(baglam, "olmayan2")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, silSonucYok, "sorguSil: olmayan key icin 0 donuyor")
+
+# kapat + tekrar ac: index yeniden kuruluyor mu (persistence)
 z = sorguKapat(baglam)
+baglam2 = sorguAc("/tmp/tan_test_query.db")
+degerAdTekrar = sorguSec(baglam2, "ad")
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("demirhan", degerAdTekrar, "sorguAc: tekrar acilinca index rebuild - guncellenmis deger korunmus")
+degerSilinenTekrar = sorguSec(baglam2, "sehir")
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("", degerSilinenTekrar, "sorguAc: tekrar acilinca silinen key hala yok")
+
+z = sorguKapat(baglam2)
 d = testSonuc(gecti, toplam)

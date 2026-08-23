@@ -39,6 +39,9 @@
 
 içe al "kutuphane/PageManager.tan"
 içe al "kutuphane/Islem.tan"
+içe al "kutuphane/ozet.tan"
+içe al "kutuphane/HashTablo.tan"
+içe al "kutuphane/araclar.tan"
 
 # ============================================================
 # Minimal Query katmanı — basit fonksiyon API'si (tam SQL
@@ -47,13 +50,20 @@ içe al "kutuphane/Islem.tan"
 # key/deger icinde geçmez varsayımı). Sayfa 4096 bayta
 # pmSayfaYaz tarafından karakter(0) ile doldurulur.
 #
+# Index: key -> sayfa no eşlemesi in-memory hash tablosunda
+# (kutuphane/HashTablo.tan) tutulur. sorguAc açılışta tüm sayfaları
+# bir kez tarayıp index'i yeniden kurar (persistence: veri diskte,
+# index bellekte + açılışta rebuild). sorguSec O(1) hash aramasıdır.
+#
 # Kullanım:
 #   içe al "veta/libraries/query/source/query.tan"
-#   baglam = sorguAc("veri.db")       # [pm, wal, txSayacKutu]
+#   baglam = sorguAc("veri.db")       # [pm, wal, txSayacKutu, htKutu]
 #   no = sorguEkle(baglam, "anahtar", "deger")   # sayfa no döner
-#   deger = sorguSec(baglam, "anahtar")          # linear tarama
+#   deger = sorguSec(baglam, "anahtar")          # O(1) hash arama
 #   # bulunamadıysa "" (bos metin) döner — cagiran bos dönüşü
 #   # 'bulunamadi' olarak yorumlar (bu modülün konvansiyonu).
+#   no2 = sorguGuncelle(baglam, "anahtar", "yeni")  # UPDATE, upsert
+#   silindi = sorguSil(baglam, "anahtar")        # DELETE: 1=silindi, 0=yok
 #   z = sorguKapat(baglam)
 #
 # NOT: Yeni dil özelliği/keyword EKLENMEDİ — sadece mevcut TAN
@@ -61,13 +71,28 @@ içe al "kutuphane/Islem.tan"
 # ============================================================
 
 # sorguAc(yol): veritabanını açar/oluşturur.
-# Döner: [pm, wal, txSayacKutu] — txSayacKutu = [1] mutable kutu,
-# her işlemde (sorguEkle) bir artırılır ve islemBaslat'a txId
-# olarak beslenir (Islem.tan kapsam sınırı: çağıran sayacı tutar).
+# Döner: [pm, wal, txSayacKutu, htKutu] — txSayacKutu = [1] mutable
+# kutu, her işlemde (sorguEkle/sorguGuncelle/sorguSil) bir artırılır
+# ve islemBaslat'a txId olarak beslenir (Islem.tan kapsam sınırı:
+# çağıran sayacı tutar). htKutu = [ht] mutable kutu; ht = key ->
+# sayfa no hash index'i, açılışta tüm sayfaların lineer taramasıyla
+# yeniden kurulur (geçersiz/silinmiş kayıtlar — key'i boş sayfalar —
+# index'e alınmaz).
 işlev sorguAc(yol)
     pm = pmAc(yol)
-    wal = walAc(yol)
-    döndür [pm, wal, [1]]
+    wal = walAc(metinBirlestir(yol, ".wal"))
+    ht = htYeni()
+    n = pmSayfaSayisi(pm)
+    i = 1
+    iken i < n
+        icerik = pmSayfaOku(pm, i)
+        k = sayfaKeyOku(icerik)
+        eğer uzunluk(k) > 0 ise
+            ht = htKoy(ht, k, metin(i))
+        son
+        i = i + 1
+    son
+    döndür [pm, wal, [1], [ht]]
 son
 
 # sorguKapat(baglam): pm'i kapatır, 0 döner.
@@ -79,7 +104,8 @@ son
 
 # sorguEkle(baglam, key, deger): key-deger çiftini transaction
 # içinde YENİ bir sayfaya yazar, sayfa numarasını döndürür
-# (cagiran isterse saklar; sorguSec index tutmaz, linear tarar).
+# (cagiran isterse saklar). İşlem başarılı olunca hash index de
+# güncellenir (htKutu[0] = htKoy(...)).
 işlev sorguEkle(baglam, key, deger)
     pm = baglam[0]
     wal = baglam[1]
@@ -91,6 +117,8 @@ işlev sorguEkle(baglam, key, deger)
     icerik = metinBirlestir(metinBirlestir(key, karakter(1)), deger)
     lsn = islemSayfaYaz(tx, no, icerik)
     z = islemCommit(tx)
+    htKutu = baglam[3]
+    htKutu[0] = htKoy(htKutu[0], key, metin(no))
     döndür no
 son
 
@@ -152,23 +180,66 @@ işlev sayfaDegerOku(icerik)
     döndür sonuc
 son
 
-# sorguSec(baglam, key): veri sayfalarını (1..n-1) linear tarar,
-# okunan key aranan key'e eşitse (metinEsit) değerini döndürür;
-# bulunamazsa "" (bos metin) döner.
+# sorguSec(baglam, key): hash index'ten (htAl) sayfa numarasına
+# O(1) erişir, sayfayı okuyup değer kısmını döndürür; bulunamazsa
+# "" (bos metin) döner. Lineer tarama YOK.
 işlev sorguSec(baglam, key)
     pm = baglam[0]
-    n = pmSayfaSayisi(pm)
-    sonuc = ""
-    i = 1
-    iken i < n
-        icerik = pmSayfaOku(pm, i)
-        okunanKey = sayfaKeyOku(icerik)
-        eğer metinEsit(okunanKey, key) ise
-            sonuc = sayfaDegerOku(icerik)
-            i = n
-        değilse
-            i = i + 1
-        son
+    htKutu = baglam[3]
+    ht = htKutu[0]
+    sayfaNoStr = htAl(ht, key)
+    eğer metinEsit(sayfaNoStr, "") ise
+        döndür ""
     son
-    döndür sonuc
+    sayfaNo = metneTam(sayfaNoStr)
+    icerik = pmSayfaOku(pm, sayfaNo)
+    döndür sayfaDegerOku(icerik)
+son
+
+# sorguGuncelle(baglam, key, yeniDeger): key'in sayfasını bulur
+# (hash index), transaction ile aynı sayfanın icerigini
+# key + karakter(1) + yeniDeger olarak yeniden yazar (UPDATE),
+# sayfa numarasını döndürür. Key index'te yoksa sorguEkle ile
+# ekler (upsert davranışı).
+işlev sorguGuncelle(baglam, key, yeniDeger)
+    pm = baglam[0]
+    wal = baglam[1]
+    txKutu = baglam[2]
+    htKutu = baglam[3]
+    sayfaNoStr = htAl(htKutu[0], key)
+    eğer metinEsit(sayfaNoStr, "") ise
+        döndür sorguEkle(baglam, key, yeniDeger)
+    son
+    sayfaNo = metneTam(sayfaNoStr)
+    txId = txKutu[0]
+    txKutu[0] = txId + 1
+    tx = islemBaslat(pm, wal, txId)
+    icerik = metinBirlestir(metinBirlestir(key, karakter(1)), yeniDeger)
+    lsn = islemSayfaYaz(tx, sayfaNo, icerik)
+    z = islemCommit(tx)
+    döndür sayfaNo
+son
+
+# sorguSil(baglam, key): key'in sayfasını transaction ile BOS
+# icerikle ("") yazar — sayfaKeyOku boş icerikte "" döndüğü için
+# kayıt 'silinmiş' işaretlenmiş olur (açılış taraması da index'e
+# almaz); hash index'ten de çıkarılır. Silinecek kayıt yoksa 0,
+# silindiyse 1 döner.
+işlev sorguSil(baglam, key)
+    pm = baglam[0]
+    wal = baglam[1]
+    txKutu = baglam[2]
+    htKutu = baglam[3]
+    sayfaNoStr = htAl(htKutu[0], key)
+    eğer metinEsit(sayfaNoStr, "") ise
+        döndür 0
+    son
+    sayfaNo = metneTam(sayfaNoStr)
+    txId = txKutu[0]
+    txKutu[0] = txId + 1
+    tx = islemBaslat(pm, wal, txId)
+    lsn = islemSayfaYaz(tx, sayfaNo, "")
+    z = islemCommit(tx)
+    htKutu[0] = htSil(htKutu[0], key)
+    döndür 1
 son
