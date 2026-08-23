@@ -2,6 +2,22 @@
 
 *Tarih: 2026-08-17. Son güncelleme — FAZ 1-5 tamamlandı, Faz 6 devam ediyor.*
 
+## ⚠️ KRİTİK BULGU (2026-08-23) — `kayıt`(struct)/`sözlük()` kullanan dosyalar KIRIK
+
+`kutuphane/AdaptiveCache.tan`, `LsmDeposu.tan`, `BAgaci.tan`, `TemporalEngine.tan`
+— hepsi `kayıt` (struct) tipi ve/veya `sözlük()` builtin'i kullanıyor. Bunlar
+NEXUS/eski Go-tabanlı yorumlayıcı (`./tan`) için yazılmış, self-hosted native
+derleyici (`TancElf`) için DEĞİL. Doğrulandı: `TancElf` bu dosyaları HATASIZ
+derliyor (BAGLAMA/DERLEME HATASI yok) ama üretilen binary **çalışma zamanında
+hiçbir şey yapmıyor** — sessiz miscompilation (test: basit `ob=onbellekAc(10);
+onbellekKoy(...); yaz(onbellekAl(...))` sıfır çıktı verdi, exit 0). Yani
+`kayıt`/`sözlük()` TancElf'te görünüşte kabul ediliyor ama gerçek kod
+üretmiyor — TEHLİKELİ bir sessiz derleyici hatası, ayrı bir iş olarak
+raporlanmalı/düzeltilmeli. **VETA bu 4 dosyayı building-block olarak
+KULLANMAMALI** — kanıtlı çalışan primitifler (dizi/ekle/uzunluk/indeks +
+`HashTablo.tan` deseni, `kayıt`/`sözlük()` OLMADAN) kullanılmalı, tıpkı
+Storage/Query/Event'in yaptığı gibi.
+
 ## Özet
 
 | Alan | Durum | Not |
