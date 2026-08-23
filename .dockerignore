@@ -1,0 +1,8 @@
+.git
+veta/frontend/node_modules
+veta/frontend/dist
+*.log
+/tmp
+gen1
+gen2
+gen3

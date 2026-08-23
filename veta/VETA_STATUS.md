@@ -511,6 +511,18 @@ tabanlı trambolin + r13 register'ının TÜM çağrı zinciri boyunca
 korunması gerekiyor (eski Go implementasyonunda kanıtlanmış desen,
 ama self-hosted derleyiciye taşınması ayrı bir dikkatli oturum ister).
 
+## Docker Paketleme ✅ TAMAMLANDI (2026-08-23) — gerçekten build+run+test edildi
+
+`Dockerfile` (repo kökü, 2 aşamalı: debian:bookworm-slim derleme +
+`FROM scratch` çalışma zamanı — TancElf statik binary ürettiği için
+sıfır OS/libc katmanı gerekiyor). `docker build -t veta:latest .` ile
+GERÇEKTEN build edildi (Docker Desktop bu oturumda kapalıydı, açılıp
+beklenip build edildi) — **imaj boyutu 249KB**. Container GERÇEKTEN
+çalıştırıldı (`docker run`, volume-mount'lu), curl ile TÜM rotalar
+doğrulandı (health/set/get/404), **container restart sonrası veri
+kalıcılığı** (volume) doğrulandı. Test container'ı ve volume'u
+temizlendi.
+
 ## Benchmark ✅ TAMAMLANDI (2026-08-23) — gerçek zamanlama, gerçek sayılar
 
 `veta/benchmarks/source/veta_benchmark.tan` — master prompt madde 42
