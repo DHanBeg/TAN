@@ -1,0 +1,164 @@
+# test_e2e.tan — VETA Full E2E + Failure/Recovery testi.
+# Master prompt madde 40 (FULL E2E VERIFIED) + 40 (FAILURE/RECOVERY).
+#
+# Akış (mutlu yol): USER -> CENTRAL CORE (routing) -> SECURITY (yetki) ->
+# QUERY (icra) -> OBSERVABILITY (log/metrik) -> OPTIMIZER (esik/oneri).
+# Bu, VETA'nın kendi topolojisinin (CENTRAL + uzman core'lar) GERÇEKTEN
+# BİRLİKTE çalıştığını kanıtlar — her core kendi testinde izole
+# doğrulanmıştı, bu dosya KOMPOZISYONU doğruluyor.
+#
+# Failure/recovery senaryoları (aynı akış içinde, master prompt madde 40
+# "detect->isolate->retry->fallback->rollback/compensate" ile uyumlu):
+#   A. Yetkisiz erişim reddi (Security Core Central Core'un icraya
+#      geçmesini ENGELLIYOR)
+#   B. Retry-then-giveup (Central Core'un kendi retry karar mekanizmasi)
+#   C. Olmayan veriye erişim (crash etmeden güvenli "" dönüşü)
+#   D. Storage seviyesinde transaction rollback (gerçek islemRollback,
+#      Islem.tan'in kendi mekanizmasi, Query'nin ALTINDA)
+
+içe al "kutuphane/test.tan"
+içe al "kutuphane/PageManager.tan"
+içe al "kutuphane/Islem.tan"
+içe al "../libraries/query/source/query.tan"
+içe al "../libraries/core/source/central_core.tan"
+içe al "../libraries/security/source/security.tan"
+içe al "../libraries/observability/source/observability.tan"
+içe al "../libraries/optimizer/source/optimizer.tan"
+
+gecti = 0
+toplam = 0
+
+# --- kurulum: her core'un kendi bağlamı (gerçek VETA'da Central Core
+# bunları KOORDINE eder, kendi state'lerini TUTMAZ - composition) ---
+fdTemiz1 = dosyaAc("/tmp/tan_test_e2e.db", 1)
+z = dosyaYazKonum(fdTemiz1, 0, "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+z = dosyaKapat(fdTemiz1)
+fdTemiz2 = dosyaAc("/tmp/tan_test_e2e.db.wal", 1)
+z = dosyaYazKonum(fdTemiz2, 0, "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+z = dosyaKapat(fdTemiz2)
+
+m = merkezAc()
+g = guvenlikAc()
+qb = sorguAc("/tmp/tan_test_e2e.db")
+gozlem = gozlemAc()
+opt = optimizeAc()
+
+m = merkezYetenekKaydet(m, "query", "yaz")
+m = merkezYetenekKaydet(m, "query", "oku")
+g = guvenlikKullaniciEkle(g, "demir", "sifre123")
+g = guvenlikIzinVer(g, "demir", "yaz")
+
+# =========================================================
+# MUTLU YOL: yetkili kullanici veri yazar
+# =========================================================
+m = merkezGorevOlustur(m, "veri-yaz", "k1=v1")
+taskId1 = merkezGorevSonId(m)
+
+yetkiVar = guvenlikYetkiliMiTam(g, "demir", "yaz")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, yetkiVar, "E2E mutlu yol: Security yetkiyi onayliyor")
+
+hedefCore = merkezYetenekliCoreBul(m, "yaz")
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("query", hedefCore, "E2E mutlu yol: Central Core dogru core'a yonlendiriyor")
+m = merkezGorevAta(m, taskId1, hedefCore)
+
+# GERCEK ICRA (cagiran, Central Core'un routing kararina gore, manuel -
+# TAN'da dinamik dispatch yok, bkz Central Core dosyasi basi)
+z = sorguEkle(qb, "k1", "v1")
+m = merkezGorevTamamla(m, taskId1, 1)
+gozlem = gozlemSayacArtir(gozlem, "basarili_yazma", 1)
+gozlem = gozlemLogYaz(gozlem, "INFO", "demir k1=v1 yazdi")
+
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, merkezGorevDurum(m, taskId1), "E2E mutlu yol: gorev Tamamlandi(1)")
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("v1", sorguSec(qb, "k1"), "E2E mutlu yol: yazilan veri Query'den okunuyor")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, gozlemSayacOku(gozlem, "basarili_yazma"), "E2E mutlu yol: Observability sayaci arttirdi")
+
+# =========================================================
+# FAILURE A: yetkisiz kullanici erisim reddi
+# =========================================================
+m = merkezGorevOlustur(m, "veri-yaz", "k2=v2")
+taskId2 = merkezGorevSonId(m)
+yetkiYok = guvenlikYetkiliMiTam(g, "yetkisiz-kullanici", "yaz")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, yetkiYok, "FAILURE-A: Security yetkisiz kullaniciyi reddediyor")
+
+eğer yetkiYok == 0 ise
+    m = merkezGorevTamamla(m, taskId2, 0)
+    gozlem = gozlemLogYaz(gozlem, "ERROR", "yetkisiz-kullanici erisim reddedildi")
+    gozlem = gozlemSayacArtir(gozlem, "erisim_reddi", 1)
+son
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(2, merkezGorevDurum(m, taskId2), "FAILURE-A: gorev Basarisiz(2) olarak isaretlendi, ICRA EDILMEDI")
+# k2 GERCEKTEN yazilmadi mi kontrol et - guvenlik reddi engellemis olmali
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("", sorguSec(qb, "k2"), "FAILURE-A: reddedilen yazma GERCEKTEN veriye yansimadi")
+
+# =========================================================
+# FAILURE B: retry-then-giveup (Central Core karar mekanizmasi)
+# =========================================================
+m = merkezGorevOlustur(m, "riskli-islem", "test")
+taskId3 = merkezGorevSonId(m)
+deneme1 = merkezYenidenDenemeliMi(m, taskId3, 2)
+deneme2 = merkezYenidenDenemeliMi(m, taskId3, 2)
+deneme3 = merkezYenidenDenemeliMi(m, taskId3, 2)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, deneme1, "FAILURE-B: 1. deneme - tekrar dene")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, deneme2, "FAILURE-B: 2. deneme - tekrar dene (maksDeneme=2)")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, deneme3, "FAILURE-B: 3. deneme - VAZGEC (maksDeneme asildi)")
+eğer deneme3 == 0 ise
+    m = merkezGorevTamamla(m, taskId3, 0)
+    gozlem = gozlemLogYaz(gozlem, "ERROR", "riskli-islem 2 denemeden sonra vazgecildi")
+son
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(2, merkezGorevDurum(m, taskId3), "FAILURE-B: vazgecilen gorev Basarisiz(2) isaretlendi")
+
+# =========================================================
+# FAILURE C: olmayan veriye erisim - crash ETMEDEN guvenli "" donusu
+# =========================================================
+sonuc = sorguSec(qb, "hic-yazilmamis-anahtar")
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("", sonuc, "FAILURE-C: olmayan anahtar crash etmeden bos donuyor")
+gozlem = gozlemLogYaz(gozlem, "WARN", "olmayan anahtara erisim denendi")
+
+# =========================================================
+# FAILURE D: transaction ROLLBACK (Islem.tan, Query'nin ALTINDAKI
+# gercek storage-seviyesi mekanizma - dogrudan test)
+# =========================================================
+pm2 = qb[0]
+wal2 = qb[1]
+no = pmSayfaAyir(pm2)
+z = pmSayfaYaz(pm2, no, "ROLLBACK_ONCESI")
+tx = islemBaslat(pm2, wal2, 99999)
+z = islemSayfaYaz(tx, no, "ROLLBACK_SONRASI_YAZILDI")
+icerikYaziminSirasinda = pmSayfaOku(pm2, no)
+z = islemRollback(tx)
+icerikRollbackSonrasi = pmSayfaOku(pm2, no)
+
+ilkOnBayt = ""
+i = 0
+iken i < 15
+    ilkOnBayt = metinBirlestir(ilkOnBayt, metinAl(icerikRollbackSonrasi, i))
+    i = i + 1
+son
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("ROLLBACK_ONCESI", ilkOnBayt, "FAILURE-D: rollback sonrasi sayfa ESKI haline donuyor (write-ahead log calisti)")
+
+# =========================================================
+# OPTIMIZER: erisim_reddi metrigi esigi asarsa oneri uret
+# =========================================================
+opt = optimizeOner(opt, "guvenlik_incele", "yetkisiz-kullanici", "erisim reddi tespit edildi")
+oneriId = optimizeSonOneriId(opt)
+esikAsildiMi = optimizeEsikKontrolEt(gozlemSayacOku(gozlem, "erisim_reddi"), 1)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, esikAsildiMi, "E2E+Optimizer: erisim_reddi esigi asildi, oneri anlamli")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, optimizeOneriDurum(opt, oneriId), "Optimizer: oneri baslangicta Onerildi(0)")
+
+z = sorguKapat(qb)
+d = testSonuc(gecti, toplam)

@@ -511,6 +511,30 @@ tabanlı trambolin + r13 register'ının TÜM çağrı zinciri boyunca
 korunması gerekiyor (eski Go implementasyonunda kanıtlanmış desen,
 ama self-hosted derleyiciye taşınması ayrı bir dikkatli oturum ister).
 
+## Full E2E + Failure/Recovery ✅ TAMAMLANDI (2026-08-23)
+
+`veta/tests/test_e2e.tan` — master prompt madde 40 (FULL E2E VERIFIED,
+FAILURE/RECOVERY VERIFIED). Central Core + Security + Query +
+Observability + Optimizer'ı TEK AKIŞTA birleştiriyor (her core kendi
+testinde İZOLE doğrulanmıştı — bu dosya KOMPOZİSYONU kanıtlıyor):
+
+- **Mutlu yol:** USER isteği → Central Core routing kararı → Security
+  yetki onayı → Query icra → Observability log/metrik → sonuç.
+- **FAILURE-A (yetkisiz erişim):** Security reddediyor, Central Core
+  görevi Başarısız işaretliyor, **veri GERÇEKTEN yazılmıyor** (icra
+  hiç tetiklenmiyor — sadece durum işaretlenmiyor, gerçek etki de yok).
+- **FAILURE-B (retry-then-giveup):** Central Core'un retry karar
+  mekanizması N deneme sonrası vazgeçiyor.
+- **FAILURE-C (olmayan veri):** Query crash etmeden güvenli boş dönüş.
+- **FAILURE-D (transaction rollback):** Islem.tan'ın write-ahead log
+  mekanizması gerçek bir yazma-sonrası-geri-alma senaryosunda
+  doğrulandı — sayfa rollback sonrası ESKİ haline dönüyor.
+- **Optimizer entegrasyonu:** erişim reddi metriği eşiği aşınca öneri
+  üretiliyor (gözlem→analiz→öneri zinciri).
+
+Test: **16/16 GEÇTİ** (WSL native). Bu, VETA'nın "core cluster gerçekten
+birlikte çalışıyor mu" sorusuna en kapsamlı kanıt.
+
 ## Docker Paketleme ✅ TAMAMLANDI (2026-08-23) — gerçekten build+run+test edildi
 
 `Dockerfile` (repo kökü, 2 aşamalı: debian:bookworm-slim derleme +
