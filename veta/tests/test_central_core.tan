@@ -1,0 +1,83 @@
+# test_central_core.tan — VETA Central Core testleri.
+# Capability registry + routing karari + task lifecycle + retry karari.
+
+içe al "kutuphane/test.tan"
+içe al "../libraries/core/source/central_core.tan"
+
+gecti = 0
+toplam = 0
+
+m = merkezAc()
+m = merkezYetenekKaydet(m, "storage", "yaz")
+m = merkezYetenekKaydet(m, "storage", "oku")
+m = merkezYetenekKaydet(m, "query", "sorgula")
+m = merkezYetenekKaydet(m, "query", "oku")
+
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, merkezCoreDestekliyorMu(m, "storage", "yaz"), "merkezYetenekKaydet: storage 'yaz' destekliyor")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, merkezCoreDestekliyorMu(m, "storage", "sorgula"), "merkezCoreDestekliyorMu: storage 'sorgula' desteklemiyor")
+
+# capability matching / core selection
+hedefYaz = merkezYetenekliCoreBul(m, "yaz")
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("storage", hedefYaz, "merkezYetenekliCoreBul: 'yaz' yetenegi icin storage bulunuyor")
+
+# birden fazla core'un destekledigi yetenek (oku) - ilk kaydedilen (storage) once gelmeli
+hedefOku = merkezYetenekliCoreBul(m, "oku")
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("storage", hedefOku, "merkezYetenekliCoreBul: birden fazla adayda ilk kaydedilen kazaniyor")
+
+# hicbir core'un desteklemedigi yetenek
+hedefYok = merkezYetenekliCoreBul(m, "olmayan-yetenek")
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("", hedefYok, "merkezYetenekliCoreBul: destekleyen yoksa bos donuyor")
+
+# task lifecycle
+m = merkezGorevOlustur(m, "veri-yaz", "{key:v}")
+taskId1 = merkezGorevSonId(m)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, taskId1, "merkezGorevOlustur: ilk gorev id=1")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, merkezGorevDurum(m, taskId1), "merkezGorevOlustur: yeni gorev durumu Beklemede(0)")
+
+m = merkezGorevAta(m, taskId1, "storage")
+m = merkezGorevTamamla(m, taskId1, 1)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, merkezGorevDurum(m, taskId1), "merkezGorevTamamla: basarili gorev durumu Tamamlandi(1)")
+
+m = merkezGorevOlustur(m, "veri-sorgula", "{key:v}")
+taskId2 = merkezGorevSonId(m)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(2, taskId2, "merkezGorevOlustur: ikinci gorev id=2")
+m = merkezGorevTamamla(m, taskId2, 0)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(2, merkezGorevDurum(m, taskId2), "merkezGorevTamamla: basarisiz gorev durumu Basarisiz(2)")
+
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(2, merkezGorevSayisi(m), "merkezGorevSayisi: toplam 2 gorev")
+
+# olmayan taskId ile islem - guvenli, degismemeli
+m = merkezGorevTamamla(m, 999, 1)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(2, merkezGorevSayisi(m), "merkezGorevTamamla: olmayan taskId sessizce yok sayiliyor")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0 - 1, merkezGorevDurum(m, 999), "merkezGorevDurum: olmayan taskId icin -1 donuyor")
+
+# retry karari - maksDeneme=3
+m = merkezGorevOlustur(m, "riskli-islem", "{}")
+taskId3 = merkezGorevSonId(m)
+d1 = merkezYenidenDenemeliMi(m, taskId3, 3)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, d1, "merkezYenidenDenemeliMi: 1. deneme (1<=3), tekrar dene")
+d2 = merkezYenidenDenemeliMi(m, taskId3, 3)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, d2, "merkezYenidenDenemeliMi: 2. deneme (2<=3), tekrar dene")
+d3 = merkezYenidenDenemeliMi(m, taskId3, 3)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, d3, "merkezYenidenDenemeliMi: 3. deneme (3<=3), tekrar dene")
+d4 = merkezYenidenDenemeliMi(m, taskId3, 3)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, d4, "merkezYenidenDenemeliMi: 4. deneme (4>3), vazgec")
+
+d = testSonuc(gecti, toplam)

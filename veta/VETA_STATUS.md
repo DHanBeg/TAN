@@ -367,7 +367,23 @@ başlanmadı) + Isolation/2D (tek-thread sınırı hâlâ geçerli).
   `veta/tests/test_ai_memory.tan` — 14/14 GEÇTİ (WSL native), consolidate
   sırasında kısa-süreli bellekten silinme + tekrar-pekiştirmede liste
   büyümeden güncelleme + arşivlemenin veriyi silmediği doğrulandı.
-- **Durum:** Storage+Query+Event+Memory+Security+Temporal+Observability+Graph+Semantic+AI Memory bitti (tek-node, eşzamanlılık yok, float fonksiyonlar bozuk). Sıradaki: Central Core veya Distributed/Optimizer/Plugin/Autonomy/Evolution (hepsi sıfır kod).
+- **Central Core** ✅ TAMAMLANDI (2026-08-23) — `veta/libraries/core/source/central_core.tan`.
+  `merkezAc/merkezYetenekKaydet/merkezCoreDestekliyorMu/
+  merkezYetenekliCoreBul/merkezGorevOlustur/merkezGorevSonId/
+  merkezGorevAta/merkezGorevTamamla/merkezGorevDurum/
+  merkezYenidenDenemeliMi/merkezGorevSayisi`. Task model + capability
+  registry + routing KARARI + retry KARARI.
+  **ÖNEMLİ SINIR (mimari, dürüst):** TAN'da fonksiyon-değeri/callback
+  yok → Central Core GERÇEK DİNAMİK DISPATCH YAPAMAZ ("şu core'un şu
+  fonksiyonunu çağır" otomatik olamaz). Bu core sadece KARARI verir
+  (hangi core'a git, tekrar dene mi/vazgeç mi) — gerçek çağrıyı ÇAĞIRAN
+  KOD kendi if/else zinciriyle yapmalı. Rollback/compensation KAPSAM
+  DIŞI (Islem.tan zaten storage-seviyesi var, cross-core compensation
+  ayrı iş). Test: `veta/tests/test_central_core.tan` — 17/17 GEÇTİ (WSL
+  native), retry sayacının FONKSİYON İÇİNDE `merkez[4]=X` ile YERİNDE
+  mutasyonu (return edilmeden) çağıranın değişkenine yansıdığı da dahil
+  doğrulandı (dizi referans semantiği bu derinlikte de tutarlı).
+- **Durum:** Storage+Query+Event+Memory+Security+Temporal+Observability+Graph+Semantic+AI Memory+Central Core bitti (tek-node, eşzamanlılık yok, float fonksiyonlar bozuk, dinamik dispatch yok). Sıradaki: Distributed/Optimizer/Plugin/Autonomy/Evolution (hepsi sıfır kod).
 
 ## Sonraki Adımlar
 

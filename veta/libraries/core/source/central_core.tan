@@ -1,0 +1,217 @@
+# ============================================================
+# central_core.tan — VETA Central Core (task model, capability matching,
+# routing kararı, retry orchestration)
+# ------------------------------------------------------------
+# VETA master prompt Central Core tanımı: "intent understanding, task
+# normalization, capability matching, core selection, routing,
+# orchestration, dependency management, transaction coordination,
+# policy enforcement, timeout, retry, fallback, rollback, compensation,
+# result aggregation, failure isolation, observability correlation."
+#
+# DÜRÜST KAPSAM (v1) — EN ÖNEMLİ SINIR: TAN'ın native ELF derleyicisinde
+# fonksiyon-DEĞERİ/callback YOK (doğrulandı, bkz NexusCore/TanDurum.md,
+# event.tan'da da aynı sınır not edilmişti). Bu yüzden Central Core
+# GERÇEK DİNAMİK DISPATCH YAPAMAZ ("şu core'un şu fonksiyonunu çağır"
+# çalışma zamanında karar verilip OTOMATİK çağrılamaz). Bunun yerine bu
+# core:
+#   - Task modelini tutar (id, intent, girdi, durum)
+#   - Capability registry tutar (hangi core hangi yeteneği destekliyor)
+#   - ROUTING KARARINI verir (hangi core'a gitmeli — coreAdi STRING'i
+#     olarak döner)
+#   - Retry/backoff KARARINI verir (denenmeli mi, vazgeçilmeli mi)
+# GERÇEK ÇAĞRIYI (execute) ÇAĞIRAN KOD yapmalı — merkezYetenekliCoreBul
+# sonucuna göre kendi if/else zinciriyle doğru core fonksiyonunu manuel
+# çağırır. Bu, TAN'ın dil kısıtı altında dürüst ve doğru olan tasarım
+# (yeni bir "fonksiyon ismi çağırma" dil özelliği EKLEMEK proje kuralına
+# aykırı olurdu). Rollback/compensation KAPSAM DIŞI (Transaction/Islem.tan
+# zaten storage seviyesinde var, cross-core compensation ayrı iş).
+#
+# Yapı: merkez = [gorevListesi, gorevIndeksHt, yetenekHt,
+#                 coreAdlariListesi, denemeSayaclariHt]
+#   gorevListesi      : dizi [id, intent, girdi, durum, coreAdi]
+#     (durum: 0=beklemede, 1=tamamlandi, 2=basarisiz)
+#   gorevIndeksHt     : HashTablo, id(metin) -> gorevListesi indeksi
+#   yetenekHt         : HashTablo, "coreAdi|yetenek" -> "1"
+#   coreAdlariListesi : dizi, TÜM kayıtlı core adları (tekrarsız)
+#   denemeSayaclariHt : HashTablo, taskId -> şu ana kadarki deneme sayısı
+#
+# Kullanım:
+#   içe al "veta/libraries/core/source/central_core.tan"
+#   m = merkezAc()
+#   m = merkezYetenekKaydet(m, "storage", "yaz")
+#   m = merkezYetenekKaydet(m, "storage", "oku")
+#   m = merkezYetenekKaydet(m, "query", "sorgula")
+#   m = merkezGorevOlustur(m, "veri-yaz", "{key:v}")
+#   taskId = merkezGorevSonId(m)
+#   hedefCore = merkezYetenekliCoreBul(m, "yaz")   # "storage"
+#   m = merkezGorevAta(m, taskId, hedefCore)
+#   # ... çağıran burada GERÇEKTEN storage.tan'ı çağırır (bu core yapmaz) ...
+#   m = merkezGorevTamamla(m, taskId, 1)
+#
+# NOT: Yeni dil özelliği/keyword EKLENMEDİ. `kayıt`/`sözlük()` KULLANILMADI.
+# HER İFADE TEK SATIRDA, `eğer X değilse` YOK (== 0) — bkz KRİTİK BULGU 2.
+# Float YOK (bkz KRİTİK BULGU 3).
+# ============================================================
+
+içe al "kutuphane/ozet.tan"
+içe al "kutuphane/HashTablo.tan"
+içe al "kutuphane/araclar.tan"
+
+# dizideIndeksi(dizi, aranan): lineer arama (diğer core'larla aynı
+# yerel-kopya desen).
+işlev dizideIndeksi(dizi, aranan)
+    i = 0
+    n = uzunluk(dizi)
+    iken i < n
+        mevcut = metinBirlestir("", dizi[i])
+        eğer metinEsit(mevcut, aranan) ise
+            döndür i
+        son
+        i = i + 1
+    son
+    döndür 0 - 1
+son
+
+# merkezAc(): boş Central Core bağlamı kurar.
+işlev merkezAc()
+    döndür [[], htYeni(), htYeni(), [], htYeni()]
+son
+
+# merkezYetenekKaydet(merkez, coreAdi, yetenek): bir core'un bir
+# yeteneği desteklediğini kaydeder (capability registry). coreAdi
+# coreAdlariListesi'nde yoksa eklenir. YENİ merkez döndürür.
+işlev merkezYetenekKaydet(merkez, coreAdi, yetenek)
+    anahtar = metinBirlestir(metinBirlestir(coreAdi, "|"), yetenek)
+    yetenekHt = htKoy(merkez[2], anahtar, "1")
+    coreAdlariListesi = merkez[3]
+    eğer dizideIndeksi(coreAdlariListesi, coreAdi) < 0 ise
+        coreAdlariListesi = ekle(coreAdlariListesi, coreAdi)
+    son
+    döndür [merkez[0], merkez[1], yetenekHt, coreAdlariListesi, merkez[4]]
+son
+
+# merkezCoreDestekliyorMu(merkez, coreAdi, yetenek): 0/1.
+işlev merkezCoreDestekliyorMu(merkez, coreAdi, yetenek)
+    anahtar = metinBirlestir(metinBirlestir(coreAdi, "|"), yetenek)
+    döndür htVarMi(merkez[2], anahtar)
+son
+
+# merkezYetenekliCoreBul(merkez, gerekliYetenek): gerekliYetenek'i
+# destekleyen İLK core'un adını döndürür (capability matching + core
+# selection). Hiçbiri desteklemiyorsa "" döner. Birden fazla core aynı
+# yeteneği destekliyorsa coreAdlariListesi'ndeki KAYIT SIRASI öncelik
+# belirler (basit strateji — yük dengeleme/öncelik puanlaması KAPSAM
+# DIŞI, dürüst).
+işlev merkezYetenekliCoreBul(merkez, gerekliYetenek)
+    coreAdlariListesi = merkez[3]
+    n = uzunluk(coreAdlariListesi)
+    i = 0
+    iken i < n
+        coreAdi = metinBirlestir("", coreAdlariListesi[i])
+        eğer merkezCoreDestekliyorMu(merkez, coreAdi, gerekliYetenek) ise
+            döndür coreAdi
+        son
+        i = i + 1
+    son
+    döndür ""
+son
+
+# merkezGorevOlustur(merkez, intent, girdi): yeni bir görev (task)
+# oluşturur (id = 1'den başlayan sayaç, durum=0 Beklemede, coreAdi="").
+# YENİ merkez döndürür ("task normalization" — ham istek yapılı Task
+# modeline dönüşür).
+işlev merkezGorevOlustur(merkez, intent, girdi)
+    gorevListesi = merkez[0]
+    id = uzunluk(gorevListesi) + 1
+    kayit = [id, intent, girdi, 0, ""]
+    gorevListesi = ekle(gorevListesi, kayit)
+    gorevIndeksHt = htKoy(merkez[1], metin(id), metin(uzunluk(gorevListesi) - 1))
+    döndür [gorevListesi, gorevIndeksHt, merkez[2], merkez[3], merkez[4]]
+son
+
+# merkezGorevSonId(merkez): en son oluşturulan görevin id'sini döndürür.
+işlev merkezGorevSonId(merkez)
+    gorevListesi = merkez[0]
+    n = uzunluk(gorevListesi)
+    eğer n == 0 ise
+        döndür 0 - 1
+    son
+    sonKayit = gorevListesi[n - 1]
+    döndür sonKayit[0]
+son
+
+# merkezGorevAta(merkez, taskId, coreAdi): görevin hangi core'a
+# yönlendirildiğini kaydeder (routing kararının kalıcı hale gelmesi).
+# taskId bulunamazsa merkez'i değiştirmeden döndürür. YENİ merkez döner.
+işlev merkezGorevAta(merkez, taskId, coreAdi)
+    indeksStr = htAl(merkez[1], metin(taskId))
+    eğer metinEsit(indeksStr, "") ise
+        döndür merkez
+    son
+    indeks = metneTam(indeksStr)
+    gorevListesi = merkez[0]
+    kayit = gorevListesi[indeks]
+    kayit[4] = coreAdi
+    döndür merkez
+son
+
+# merkezGorevTamamla(merkez, taskId, basariliMi): görevin durumunu
+# günceller (1=tamamlandı, 2=başarısız). taskId bulunamazsa merkez'i
+# değiştirmeden döndürür.
+işlev merkezGorevTamamla(merkez, taskId, basariliMi)
+    indeksStr = htAl(merkez[1], metin(taskId))
+    eğer metinEsit(indeksStr, "") ise
+        döndür merkez
+    son
+    indeks = metneTam(indeksStr)
+    gorevListesi = merkez[0]
+    kayit = gorevListesi[indeks]
+    eğer basariliMi == 1 ise
+        kayit[3] = 1
+    değilse
+        kayit[3] = 2
+    son
+    döndür merkez
+son
+
+# merkezGorevDurum(merkez, taskId): görevin durumunu döndürür
+# (0=beklemede, 1=tamamlandı, 2=başarısız). Bulunamazsa 0-1 döner.
+işlev merkezGorevDurum(merkez, taskId)
+    indeksStr = htAl(merkez[1], metin(taskId))
+    eğer metinEsit(indeksStr, "") ise
+        döndür 0 - 1
+    son
+    indeks = metneTam(indeksStr)
+    gorevListesi = merkez[0]
+    kayit = gorevListesi[indeks]
+    döndür kayit[3]
+son
+
+# merkezYenidenDenemeliMi(merkez, taskId, maksDeneme): "policy
+# enforcement + retry" kararı. Her çağrıda taskId'nin deneme sayacını
+# +1 yapar (yerinde, denemeSayaclariHt YENİDEN atanır ama merkez'in
+# GERİ KALANI değişmez — çağıran YENİ merkez'i saklamalı). Sayaç
+# maksDeneme'yi AŞMADIYSA 1 (tekrar dene), aştıysa 0 (vazgeç, fallback'e
+# geç) döner. Gerçek execute/timeout/backoff süresi bu fonksiyonun
+# KAPSAMI DIŞI (TAN'da thread/sleep yok) — sadece "deneme sayısı bazlı"
+# karar verir.
+işlev merkezYenidenDenemeliMi(merkez, taskId, maksDeneme)
+    mevcutStr = htAl(merkez[4], metin(taskId))
+    eğer metinEsit(mevcutStr, "") ise
+        mevcut = 0
+    değilse
+        mevcut = metneTam(mevcutStr)
+    son
+    yeni = mevcut + 1
+    denemeSayaclariHt = htKoy(merkez[4], metin(taskId), metin(yeni))
+    merkez[4] = denemeSayaclariHt
+    eğer yeni > maksDeneme ise
+        döndür 0
+    son
+    döndür 1
+son
+
+# merkezGorevSayisi(merkez): toplam görev sayısı.
+işlev merkezGorevSayisi(merkez)
+    döndür uzunluk(merkez[0])
+son
