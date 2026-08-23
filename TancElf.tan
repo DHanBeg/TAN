@@ -1820,6 +1820,34 @@ işlev leaDolayli(hedef, taban, disp)
     döndür [bcBayt(rex), bcBayt(141), bcBayt(modrmBayt(1, hedef, taban)), bcBayt(dispBayt)]
 son
 
+# ---------------- 2D EŞZAMANLILIK: kilit/atomik opcode ilkelleri ----------------
+# lock cmpxchg [taban], kaynak (F0 REX 0F B1 /r) — CPU RAX'i implicit
+# karşılaştırma değeri olarak kullanır: [taban]==RAX ise [taban]=kaynak ve
+# ZF=1; değilse RAX=[taban] (GÜNCEL değer) ve ZF=0. Atomik CAS.
+işlev lockCmpxchgBellek(taban, kaynak)
+    rex = 72
+    eğer kaynak >= 8 ise
+        rex = rex + 4
+    son
+    eğer taban >= 8 ise
+        rex = rex + 1
+    son
+    döndür [bcBayt(240), bcBayt(rex), bcBayt(15), bcBayt(177), bcBayt(modrmBayt(0, kaynak, taban))]
+son
+
+# lock xadd [taban], kaynakHedef (F0 REX 0F C1 /r) — [taban]+=kaynakHedef
+# (atomik); kaynakHedef = [taban]'ın ESKİ değeri. Atomik fetch-and-add.
+işlev lockXaddBellek(taban, kaynakHedef)
+    rex = 72
+    eğer kaynakHedef >= 8 ise
+        rex = rex + 4
+    son
+    eğer taban >= 8 ise
+        rex = rex + 1
+    son
+    döndür [bcBayt(240), bcBayt(rex), bcBayt(15), bcBayt(193), bcBayt(modrmBayt(0, kaynakHedef, taban))]
+son
+
 # shl r64, imm8 (C1 /4)
 işlev shlImm(r, v)
     rex = 72
@@ -3699,6 +3727,123 @@ işlev dosyaKapatBant()
     döndür listeBirlestir(b, retBant())
 son
 
+# ---------------- 2D EŞZAMANLILIK: mmap + ham bellek + futex + kilit + atomik ----------------
+# VETA_STATUS.md FAZ5_BLOCKED_KATALOGU 2D maddesi. Eski Go backend'deki
+# (DerleElf.go, commit 2976ac8, Go-removal'da silindi) icParcaLat/futex/
+# kilit/atomik tasarımının SELF-HOSTED derleyiciye taşınmış hali — kilit/
+# futex/atomik kısmı (thread creation/icParcaLat HARİÇ, o ayrı ve çok daha
+# riskli bir sonraki adım). Argümanlar generic CAGRI dispatch'inin SysV
+# kayıt sırasıyla (rdi,rsi,rdx,rcx,r8,r9) zaten doğru yerde geldiği için
+# HİÇBİRİ özel CAGRI dispatch case'i GEREKTİRMİYOR — sadece f_<ad> etiketli
+# birer "yaprak" (leaf) rutin, yardimciBantlar/yardimciAdlar'a eklenmesi
+# yeterli.
+
+# bellekEsle(boyut) -> mmap(NULL, boyut, PROT_READ|PROT_WRITE,
+# MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) ile anonim RW bellek ayırır, adresi
+# tam sayı olarak döndürür. sys_mmap = 9. mmap sıfır-doldurur (kilit için
+# "0 = açık" başlangıç durumu buradan gelir).
+işlev bellekEsleBant()
+    b = [bcEtiket("f_bellekEsle")]
+    b = listeBirlestir(b, movKayit(6, 7))        # rsi = boyut (1. parametre rdi'de geldi)
+    b = listeBirlestir(b, xorKayit(7, 7))         # rdi = 0 (addr=NULL, kernel seçsin)
+    b = listeBirlestir(b, movImm32(2, 3))         # rdx = PROT_READ|PROT_WRITE
+    b = listeBirlestir(b, movImm32(10, 34))       # r10 = MAP_PRIVATE|MAP_ANONYMOUS (0x22)
+    b = listeBirlestir(b, movImm32(8, 0 - 1))     # r8 = -1 (fd)
+    b = listeBirlestir(b, xorKayit(9, 9))         # r9 = 0 (offset)
+    b = listeBirlestir(b, movImm32(0, 9))         # rax = 9 (sys_mmap)
+    b = listeBirlestir(b, syscallEmit())
+    döndür listeBirlestir(b, retBant())
+son
+
+# hamOku8(adres) -> adresteki 8 baytı tam sayı olarak okur.
+işlev hamOku8Bant()
+    b = [bcEtiket("f_hamOku8")]
+    b = listeBirlestir(b, movPtrOku(0, 7))       # rax = [rdi]
+    döndür listeBirlestir(b, retBant())
+son
+
+# hamYaz8(adres, deger) -> adrese 8 baytlık tam sayı yazar, deger'i döndürür.
+işlev hamYaz8Bant()
+    b = [bcEtiket("f_hamYaz8")]
+    b = listeBirlestir(b, movPtrYaz(7, 6))       # [rdi] = rsi
+    b = listeBirlestir(b, movKayit(0, 6))        # rax = deger
+    döndür listeBirlestir(b, retBant())
+son
+
+# futexWait(adres, beklenen) -> [adres] HÂLÂ beklenen İSE uyur (kernel
+# atomik kontrol eder — kaçırılan uyandırma YOK); değilse hemen döner
+# (EAGAIN). sys_futex = 202, FUTEX_WAIT = 0.
+işlev futexWaitBant()
+    b = [bcEtiket("f_futexWait")]
+    b = listeBirlestir(b, movKayit(2, 6))         # rdx = val (beklenen değer)
+    b = listeBirlestir(b, movImm32(6, 0))         # rsi = FUTEX_WAIT
+    b = listeBirlestir(b, xorKayit(10, 10))       # r10 = timeout = NULL
+    b = listeBirlestir(b, movImm32(0, 202))       # rax = sys_futex
+    b = listeBirlestir(b, syscallEmit())
+    döndür listeBirlestir(b, retBant())
+son
+
+# futexWake(adres, sayi) -> sayi kadar bekleyen ipliği uyandırır.
+işlev futexWakeBant()
+    b = [bcEtiket("f_futexWake")]
+    b = listeBirlestir(b, movKayit(2, 6))         # rdx = sayı
+    b = listeBirlestir(b, movImm32(6, 1))         # rsi = FUTEX_WAKE
+    b = listeBirlestir(b, movImm32(0, 202))
+    b = listeBirlestir(b, syscallEmit())
+    döndür listeBirlestir(b, retBant())
+son
+
+# kilitOlustur() -> yeni bir kilit (8 baytlık, mmap sıfır-doldurduğu için
+# 0 = AÇIK ile başlar). bellekEsle(8) ile aynı.
+işlev kilitOlusturBant()
+    b = [bcEtiket("f_kilitOlustur")]
+    b = listeBirlestir(b, movImm32(7, 8))         # rdi = 8
+    b = listeBirlestir(b, callBant("f_bellekEsle"))
+    döndür listeBirlestir(b, retBant())
+son
+
+# kilitle(kilit) -> lock cmpxchg ile CAS(0->1) dener; başarısızsa GÜNCEL
+# değeri (cmpxchg'nin rax'a yazdığı) bekleyerek futexWait, tekrar dener.
+# rdi (kilit adresi) f_futexWait çağrısı boyunca DOKUNULMADAN kalır
+# (futexWaitBant rdi'yi hiç kullanmıyor/klobretmiyor — doğrulandı).
+işlev kilitleBant()
+    b = [bcEtiket("f_kilitle")]
+    b = ekle(b, bcEtiket("Lkil_dongu"))
+    b = listeBirlestir(b, xorKayit(0, 0))         # rax = 0 (beklenen: açık)
+    b = listeBirlestir(b, movImm32(1, 1))         # rcx = 1 (yeni: kilitli)
+    b = listeBirlestir(b, lockCmpxchgBellek(7, 1)) # taban=rdi (kilit adresi, parametre)
+    b = listeBirlestir(b, jccBant(132, "Lkil_alindi")) # je (ZF=1 -> CAS başarılı)
+    b = listeBirlestir(b, movKayit(6, 0))         # rsi = GÜNCEL değer (cmpxchg rax'a yazdı)
+    b = listeBirlestir(b, callBant("f_futexWait")) # rdi hâlâ kilit adresi
+    b = listeBirlestir(b, jmpBant("Lkil_dongu"))
+    b = ekle(b, bcEtiket("Lkil_alindi"))
+    b = listeBirlestir(b, movImm32(0, 0))
+    döndür listeBirlestir(b, retBant())
+son
+
+# kilidiAc(kilit) -> [kilit]=0 (açık), futexWake(kilit,1). rdi (kilit
+# adresi) movPtrYaz'dan sonra da değişmeden kalır (taban okunur, klobre
+# edilmez) — f_futexWake çağrısına AYNEN geçer.
+işlev kilidiAcBant()
+    b = [bcEtiket("f_kilidiAc")]
+    b = listeBirlestir(b, xorKayit(1, 1))
+    b = listeBirlestir(b, movPtrYaz(7, 1))        # [rdi] = 0
+    b = listeBirlestir(b, movImm32(6, 1))         # rsi = 1 (uyandırılacak sayı)
+    b = listeBirlestir(b, callBant("f_futexWake")) # rdi hâlâ kilit adresi
+    b = listeBirlestir(b, movImm32(0, 0))
+    döndür listeBirlestir(b, retBant())
+son
+
+# atomikEkleHam(adres, miktar) -> lock xadd ile [adres]+=miktar (atomik),
+# YENİ değeri döndürür.
+işlev atomikEkleHamBant()
+    b = [bcEtiket("f_atomikEkleHam")]
+    b = listeBirlestir(b, movKayit(0, 6))         # rax = miktar (xadd kaynağı)
+    b = listeBirlestir(b, lockXaddBellek(7, 0))   # [rdi]+=rax (atomik); rax=ESKİ değer
+    b = listeBirlestir(b, addKayit(0, 6))         # rax = eski + miktar = YENİ değer
+    döndür listeBirlestir(b, retBant())
+son
+
 # ---------------- PROGRAM ARGÜMANLARI (libc yok, ham yığın) ----------------
 # _start'ta rsp -> [argc][argv0][argv1]... Bu taban rsp DEĞİŞTİRİLMEDEN ÖNCE
 # saklanmalı — DerleElf.go argvYakala/yardimciArgsay/yardimciArg ile birebir
@@ -5096,6 +5241,12 @@ işlev yardimciBagimliliklari(ad)
         döndür ["f_tan_ayir", "f_bellek_kopyala"]
     değilse eğer metinEsit(ad, "f_izleRegs") ise
         döndür ["f_tan_ayir"]
+    değilse eğer metinEsit(ad, "f_kilitOlustur") ise
+        döndür ["f_bellekEsle"]
+    değilse eğer metinEsit(ad, "f_kilitle") ise
+        döndür ["f_futexWait"]
+    değilse eğer metinEsit(ad, "f_kilidiAc") ise
+        döndür ["f_futexWake"]
     son
     döndür []
 son
@@ -5181,8 +5332,8 @@ degiskenSayisi = uzunluk(adlarKutu[0])
 cerceveBoy = 8 * degiskenSayisi + 16
 
 # --- Faz 5 (B): kullanılan yardımcı kümesini govde bandından çıkar ---
-yardimciAdlar = ["yaz_sayi", "f_tan_ayir", "f_bellek_kopyala", "f_liste_ekle", "f_liste_yap", "f_sayi_metne", "f_metin_birlestir", "f_metin_esit", "f_metin_indeks", "f_kod", "f_karakter", "f_yaz_metin", "f_yazHam", "f_zaman", "f_soketAc", "f_soketBagla", "f_soketYaz", "f_soketOku", "f_soketKapat", "f_soketDinle", "f_soketKabul", "f_catal", "f_izle", "f_calistir", "f_bekle", "f_izleRegs", "f_oku", "f_yazDosya", "f_yazDosyaCalistirilabilir", "f_dosyaAc", "f_dosyaOkuKonum", "f_dosyaYazKonum", "f_dosyaKapat", "f_girdiOku", "f_girdiOkuN", "f_dosyaVarMi", "f_yazBaytlar", "f_argsay", "f_arg", "f_kesir_metne", "f_yaz_kesir", "f_hata_sifira_bolme"]
-yardimciBantlar = [yazSayiBant(), tanAyirBant(), bellekKopyalaBant(), listeEkleBant(), listeYapBant(), sayiMetneBant(), metinBirlestirBant(), metinEsitBant(), metinIndeksBant(), kodBant(), karakterBant(), yazMetinBant(), yazHamBant(), zamanBant(), soketAcBant(), soketBaglaBant(), soketYazBant(), soketOkuBant(), soketKapatBant(), soketDinleBant(), soketKabulBant(), catalBant(), izleBant(), calistirBant(), bekleBant(), izleRegsBant(), okuBant(), yazDosyaBant(), yazDosyaCalistirilabilirBant(), dosyaAcBant(), dosyaOkuKonumBant(), dosyaYazKonumBant(), dosyaKapatBant(), girdiOkuBant(), girdiOkuNBant(), dosyaVarMiBant(), yazBaytlarBant(), argsayBant(), argBant(), kesirMetneBant(), yazKesirBant(), hataSifiraBolmeBant()]
+yardimciAdlar = ["yaz_sayi", "f_tan_ayir", "f_bellek_kopyala", "f_liste_ekle", "f_liste_yap", "f_sayi_metne", "f_metin_birlestir", "f_metin_esit", "f_metin_indeks", "f_kod", "f_karakter", "f_yaz_metin", "f_yazHam", "f_zaman", "f_soketAc", "f_soketBagla", "f_soketYaz", "f_soketOku", "f_soketKapat", "f_soketDinle", "f_soketKabul", "f_catal", "f_izle", "f_calistir", "f_bekle", "f_izleRegs", "f_oku", "f_yazDosya", "f_yazDosyaCalistirilabilir", "f_dosyaAc", "f_dosyaOkuKonum", "f_dosyaYazKonum", "f_dosyaKapat", "f_girdiOku", "f_girdiOkuN", "f_dosyaVarMi", "f_yazBaytlar", "f_argsay", "f_arg", "f_kesir_metne", "f_yaz_kesir", "f_hata_sifira_bolme", "f_bellekEsle", "f_hamOku8", "f_hamYaz8", "f_futexWait", "f_futexWake", "f_kilitOlustur", "f_kilitle", "f_kilidiAc", "f_atomikEkleHam"]
+yardimciBantlar = [yazSayiBant(), tanAyirBant(), bellekKopyalaBant(), listeEkleBant(), listeYapBant(), sayiMetneBant(), metinBirlestirBant(), metinEsitBant(), metinIndeksBant(), kodBant(), karakterBant(), yazMetinBant(), yazHamBant(), zamanBant(), soketAcBant(), soketBaglaBant(), soketYazBant(), soketOkuBant(), soketKapatBant(), soketDinleBant(), soketKabulBant(), catalBant(), izleBant(), calistirBant(), bekleBant(), izleRegsBant(), okuBant(), yazDosyaBant(), yazDosyaCalistirilabilirBant(), dosyaAcBant(), dosyaOkuKonumBant(), dosyaYazKonumBant(), dosyaKapatBant(), girdiOkuBant(), girdiOkuNBant(), dosyaVarMiBant(), yazBaytlarBant(), argsayBant(), argBant(), kesirMetneBant(), yazKesirBant(), hataSifiraBolmeBant(), bellekEsleBant(), hamOku8Bant(), hamYaz8Bant(), futexWaitBant(), futexWakeBant(), kilitOlusturBant(), kilitleBant(), kilidiAcBant(), atomikEkleHamBant()]
 kullanilanYardimcilar = yardimciKullanimiTara(govde, yardimciAdlar)
 gomulcekYardimcilar = yardimciKapanisi(kullanilanYardimcilar)
 

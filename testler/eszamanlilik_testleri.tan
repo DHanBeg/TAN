@@ -1,0 +1,91 @@
+# EszamanlilikTestleri.tan — 2D eşzamanlılık ilkelleri (mmap/ham bellek/
+# futex/kilit/atomik) testleri. TancElf.tan'a 2026-08-23'te eklendi.
+#
+# DÜRÜST KAPSAM: Bu test SIRALI (tek iplik) çalışır — gerçek OS thread'i
+# (clone/içParcaLat) HENÜZ EKLENMEDİ (ayrı, daha riskli bir sonraki adım,
+# bkz VETA_STATUS.md). Bu yüzden burada doğrulanan: (1) mmap ile ham
+# bellek ayırma çalışıyor, (2) ham bellek okuma/yazma doğru, (3) kilit
+# mekanizması (CAS + futex) sıralı senaryoda doğru açılıp kapanıyor,
+# (4) atomikEkleHam'ın aritmetiği doğru. GERÇEK YARIŞ KOŞULU KORUMASI
+# (birden fazla ipliğin AYNI ANDA kilide/sayaça saldırması) bu testte
+# KANITLANMIYOR — thread creation eklenince ayrı bir test gerekecek.
+
+içe al "kutuphane/test.tan"
+
+gecti = 0
+toplam = 0
+
+# --- mmap + ham bellek okuma/yazma ---
+adres = bellekEsle(8)
+toplam = toplam + 1
+gecti = gecti + iddiaDogru(adres != 0, "bellekEsle: mmap sifir olmayan adres donduruyor")
+
+baslangicDeger = hamOku8(adres)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, baslangicDeger, "bellekEsle: mmap sifir-dolduruyor (yeni bellek 0)")
+
+z = hamYaz8(adres, 42)
+okunan = hamOku8(adres)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(42, okunan, "hamYaz8/hamOku8: round-trip dogru")
+
+z = hamYaz8(adres, 0 - 7)
+okunanNegatif = hamOku8(adres)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0 - 7, okunanNegatif, "hamYaz8/hamOku8: negatif deger de dogru")
+
+# --- kilit (CAS + futex) ---
+kilit = kilitOlustur()
+degerAcik = hamOku8(kilit)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, degerAcik, "kilitOlustur: yeni kilit acik (0) baslar")
+
+z = kilitle(kilit)
+degerKilitli = hamOku8(kilit)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, degerKilitli, "kilitle: CAS basariyla 0->1 gecirdi")
+
+z = kilidiAc(kilit)
+degerTekrarAcik = hamOku8(kilit)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, degerTekrarAcik, "kilidiAc: kilit tekrar acik (0)")
+
+# tekrar kilitle/ac dongusu - kilit yeniden kullanilabilir olmali
+z = kilitle(kilit)
+z = kilidiAc(kilit)
+degerSonKontrol = hamOku8(kilit)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, degerSonKontrol, "kilitle/kilidiAc: kilit tekrar tekrar kullanilabiliyor")
+
+# --- atomikEkleHam ---
+sayac = bellekEsle(8)
+i = 0
+iken i < 1000
+    z = atomikEkleHam(sayac, 1)
+    i = i + 1
+son
+sonucSayac = hamOku8(sayac)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1000, sonucSayac, "atomikEkleHam: 1000 sirali +1 toplami dogru")
+
+donenDeger = atomikEkleHam(sayac, 5)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1005, donenDeger, "atomikEkleHam: fonksiyon YENI degeri donduruyor (eski degil)")
+
+# negatif miktar (eksiltme) de calismali
+z = atomikEkleHam(sayac, 0 - 5)
+sonucSonrasi = hamOku8(sayac)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1000, sonucSonrasi, "atomikEkleHam: negatif miktar (eksiltme) da calisiyor")
+
+# --- iki bagimsiz kilit birbirini etkilemiyor ---
+kilit2 = kilitOlustur()
+z = kilitle(kilit)
+degerKilit1 = hamOku8(kilit)
+degerKilit2 = hamOku8(kilit2)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, degerKilit1, "iki bagimsiz kilit: birincisi kilitli")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, degerKilit2, "iki bagimsiz kilit: ikincisi etkilenmedi, hala acik")
+
+d = testSonuc(gecti, toplam)

@@ -455,6 +455,62 @@ başlanmadı) + Isolation/2D (tek-thread sınırı hâlâ geçerli).
   TAN'da fonksiyon-değeri yok). Kalan: 2D eşzamanlılık (derleyici-
   seviyesi, ÇOK YÜKSEK karmaşıklık, ayrı dikkatli oturum gerektirir).
 
+## 2D Eşzamanlılık — KISMEN TAMAMLANDI (2026-08-23) — kilit/atomik/ham bellek çalışıyor
+
+TancElf.tan'a (SELF-HOSTED derleyicinin KENDİSİ, kütüphane değil —
+`veta/libraries/` dosyalarından FARKLI, bu doğrudan derleyici düzeyinde
+bir değişiklik) yeni native yerleşikler eklendi. Eski Go backend'deki
+(`DerleElf.go`, commit `2976ac8`, Go-removal'da silindi) tasarımın
+kilit/futex/atomik kısmı self-hosted derleyiciye taşındı — **thread
+creation (clone/içParcaLat) HARİÇ**, o ayrı ve daha riskli bir sonraki
+adım (aşağıya bakın).
+
+**Eklenen yerleşikler** (hepsi generic CAGRI dispatch üzerinden çalışıyor,
+özel derleyici-dispatch case'i GEREKMEDİ):
+- `bellekEsle(boyut)` — mmap (sys_mmap=9) ile anonim RW bellek ayırır.
+- `hamOku8(adres)` / `hamYaz8(adres,deger)` — ham bellek 8-bayt okuma/yazma.
+- `futexWait(adres,beklenen)` / `futexWake(adres,sayi)` — sys_futex=202.
+- `kilitOlustur()` / `kilitle(kilit)` / `kilidiAc(kilit)` — CAS (lock
+  cmpxchg) + futex tabanlı mutex.
+- `atomikEkleHam(adres,miktar)` — lock xadd ile atomik fetch-and-add.
+
+**Yeni opcode ilkelleri** (TancElf.tan'ın kendi x86-64 kod üretici
+kütüphanesine eklendi): `lockCmpxchgBellek`, `lockXaddBellek`.
+
+**Bulunan ve düzeltilen 2 gerçek derleyici bug'ı (bu oturumda):**
+1. Reachability/closure eksikliği: `kilitOlustur` kendi içinde
+   `f_bellekEsle`'yi çağırıyordu ama bu bağımlılık `yardimciBagimliliklari`
+   tablosunda yoktu — hedef program `kilitOlustur()`'ü çağırdığında
+   "BAGLAMA HATASI: etiket bulunamadi: f_bellekEsle" veriyordu. Düzeltme:
+   `yardimciBagimliliklari`'na `f_kilitOlustur->f_bellekEsle`,
+   `f_kilitle->f_futexWait`, `f_kilidiAc->f_futexWake` eklendi.
+2. **`bcEtiket()` yanlış API kullanımı** (BENİM hatam, ciddi): `bcEtiket()`
+   TEK bir kayıt döndürüyor, LİSTE değil — bir bytecode listesine
+   eklemek için `listeBirlestir(liste, bcEtiket(...))` DEĞİL, `ekle(liste,
+   bcEtiket(...))` kullanılmalı. Yanlış kullanım derleyiciyi (g1) HEDEF
+   PROGRAM derlerken SEGFAULT ettiriyordu (compile-time çökme, malformed
+   bytecode stream). İkili aramayla (fonksiyon fonksiyon dosyayı kesip
+   test ederek) izole edilip düzeltildi. **Ders: bu iki desen VETA/TAN
+   kod tabanında tekrar kontrol edilmeli.**
+
+**Doğrulama:** `testler/eszamanlilik_testleri.tan` — 13/13 GEÇTİ
+(mmap+ham bellek round-trip, kilit aç/kapat/tekrar-kullan, atomik
+1000x toplama, iki bağımsız kilidin birbirini etkilememesi). Self-hosting
+sabit noktası (gen1==gen2==gen3, TEK WSL invocation içinde — ayrı
+invocation'lar arası `/tmp` KALICI DEĞİL, bu oturumda yeniden keşfedildi/
+doğrulandı) korundu. `TestAraclar.sh` (16/16) ve `TestArkaUcGoSuzTemiz.sh`
+temiz. `TancElf` binary'si güncellendi ve commit'lendi (bootstrap tohumu).
+
+**DÜRÜST SINIR — SIRALI test edildi, GERÇEK EŞZAMANLILIK henüz YOK:**
+Bu testler TEK İPLİKTE (sıralı) çalışıyor — kilidin/atomiğin GERÇEK
+YARIŞ KOŞULU koruması (birden fazla OS thread'inin AYNI ANDA saldırması)
+KANITLANMADI, çünkü **thread creation (clone syscall + trampoline
+deseni, `içParcaLat`) HENÜZ EKLENMEDİ**. Bu, kalan ve en riskli parça:
+fonksiyon-değeri olmadığı için derleme-zamanı bilinen işlev adı + jmp-
+tabanlı trambolin + r13 register'ının TÜM çağrı zinciri boyunca
+korunması gerekiyor (eski Go implementasyonunda kanıtlanmış desen,
+ama self-hosted derleyiciye taşınması ayrı bir dikkatli oturum ister).
+
 ## Frontend ✅ DOĞRULANDI (2026-08-23) — React+Vite+TS, çalışıyor
 
 `veta/frontend/` — React 19 + Vite 8 + TypeScript, `recharts` (grafik),
