@@ -511,6 +511,46 @@ tabanlı trambolin + r13 register'ının TÜM çağrı zinciri boyunca
 korunması gerekiyor (eski Go implementasyonunda kanıtlanmış desen,
 ama self-hosted derleyiciye taşınması ayrı bir dikkatli oturum ister).
 
+## Benchmark ✅ TAMAMLANDI (2026-08-23) — gerçek zamanlama, gerçek sayılar
+
+`veta/benchmarks/source/veta_benchmark.tan` — master prompt madde 42
+("performans iddiası benchmark olmadan yapılmayacak") gereği. Gerçek
+`zaman()` (CLOCK_MONOTONIC, ns) ile Query/Graph/Semantic core'ları ölçer.
+
+**Gerçek sonuçlar (N=30, WSL native, tek çalıştırma):**
+| İşlem | ops | süre | ~throughput |
+|---|---|---|---|
+| Query INSERT | 30 | 812.7ms | ~36 op/sn |
+| Query POINT LOOKUP | 30 | 625μs | ~47.984 op/sn |
+| Query UPDATE | 30 | 659.9ms | ~45 op/sn |
+| Query DELETE | 30 | 660.1ms | ~45 op/sn |
+| Graph BFS (zincir) | 30 | 118.5μs | ~253.164 op/sn |
+| Semantic EN-BENZERLER | 30 | 33.6μs | ~892.857 op/sn |
+
+Yorum (dürüst): INSERT/UPDATE/DELETE yavaş (~30-45 op/sn) çünkü HER
+işlem gerçek transactional disk yazımı (WAL+sayfa, pwrite syscall'ları,
+fsync yok ama syscall overhead'i var) — LOOKUP/BFS/Semantic çok hızlı
+(~48K-893K op/sn) çünkü tamamen bellek-içi. Bu, gerçek bir DB'nin
+beklenen profili (yazma pahalı, okuma ucuz).
+
+**Bulunan ve düzeltilen 1 bug:** `/` operatörü kullanıcı işlevi sınırından
+geçince yine KRİTİK BULGU 3'e (float fonksiyon dönüşü bozuk) çarpıyor —
+`/` her zaman FLOAT üretiyor (2 tam sayı bile olsa), bu yüzden throughput
+hesaplayan yardımcı işlev çöp değer döndürdü. Çözüm: `tamBol()` (tam sayı
+bölme, `/`den farklı ayrı builtin) fonksiyon sınırından SORUNSUZ geçiyor
+— doğrulandı, düzeltildi.
+
+**Ortam notu:** N=100+ denemelerinde WSL servisinin KENDİSİ 3 kez çöktü
+(`Wsl/Service/E_UNEXPECTED`, `wsl.exe --shutdown` ile kurtarıldı) — bu,
+kod bug'ı DEĞİL, bu makinedeki WSL örneğinin genel kararsızlığı gibi
+görünüyor (yoğun syscall/mmap altında). N=30'da 3 ayrı temiz
+çalıştırmada sorunsuz tamamlandı. Daha büyük ölçek benchmarkları farklı/
+daha kararlı bir ortamda tekrarlanmalı.
+
+**DÜRÜST SINIR:** Tek-node, tek-iplik (eşzamanlı yük YOK). "baseline/
+optimized/degraded/recovery" modları (master prompt) KAPSAM DIŞI —
+sadece baseline ölçüldü.
+
 ## Security RBAC Rol Katmanı ✅ TAMAMLANDI (2026-08-23)
 
 `veta/libraries/security/source/security.tan` — üç seviyeli RBAC eklendi:

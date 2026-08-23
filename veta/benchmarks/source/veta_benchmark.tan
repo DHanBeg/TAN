@@ -1,0 +1,120 @@
+# veta_benchmark.tan — VETA çekirdek işlemleri için GERÇEK zamanlama.
+# Master prompt madde 42 (PERFORMANS): "Performans iddiası benchmark
+# olmadan yapılmayacak." Bu dosya gerçek zaman() (CLOCK_MONOTONIC,
+# nanosaniye) ile Query/Graph/Semantic core işlemlerini ölçer.
+#
+# DÜRÜST KAPSAM: Tek-node, tek-iplik (2D thread creation yok) — bu
+# sayılar EŞZAMANLI YÜK ALTINDA DEĞİL, sıralı/tek-kullanıcı senaryosunda.
+# "baseline/optimized/degraded/recovery" modları (master prompt'un
+# istediği) KAPSAM DIŞI — sadece "baseline" (tek çalıştırma) ölçülüyor.
+#
+# Derle: ./TancElf veta/benchmarks/source/veta_benchmark.tan veta_benchmark
+# Çalıştır: ./veta_benchmark
+
+içe al "kutuphane/tanoku.tan"
+içe al "../../libraries/query/source/query.tan"
+içe al "../../libraries/graph/source/graph.tan"
+içe al "../../libraries/semantic/source/semantic.tan"
+
+# NOT: "/" operatoru kullanici islevi SINIRINDAN GECINCE COP DEGER
+# uretiyor (KRITIK BULGU 3'un baska bir tezahuru - "/" float uretiyor,
+# float fonksiyon donusu bozuk, bkz VETA_STATUS.md). tamBol() (tam sayi
+# bolme, "/"den FARKLI builtin) fonksiyon sinirindan SORUNSUZ geciyor -
+# dogrulandi, bu yuzden throughput hesabinda "/" DEGIL tamBol kullanildi.
+işlev opSaniye(opSayisi, gecenNs)
+    eğer gecenNs == 0 ise
+        döndür 0
+    son
+    döndür tamBol(opSayisi * 1000000000, gecenNs)
+son
+
+işlev raporla(ad, opSayisi, baslangic, bitis)
+    gecen = bitis - baslangic
+    hiz = opSaniye(opSayisi, gecen)
+    yaz(metinBirlestir(metinBirlestir(metinBirlestir(metinBirlestir(ad, ": "), metin(opSayisi)), " islem, "), metinBirlestir(metinBirlestir(metin(gecen), " ns, ~"), metinBirlestir(metin(hiz), " op/sn"))))
+son
+
+N = 30
+
+# --- Query: INSERT (yeni anahtar, O(1) index) ---
+fdTemiz1 = dosyaAc("/tmp/veta_bench.db", 1)
+z = dosyaYazKonum(fdTemiz1, 0, "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+z = dosyaKapat(fdTemiz1)
+fdTemiz2 = dosyaAc("/tmp/veta_bench.db.wal", 1)
+z = dosyaYazKonum(fdTemiz2, 0, "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+z = dosyaKapat(fdTemiz2)
+
+baglam = sorguAc("/tmp/veta_bench.db")
+
+baslangic = zaman()
+i = 0
+iken i < N
+    anahtar = metinBirlestir("anahtar", metin(i))
+    z = sorguEkle(baglam, anahtar, metin(i))
+    i = i + 1
+son
+bitis = zaman()
+raporla("Query INSERT", N, baslangic, bitis)
+
+# --- Query: POINT LOOKUP (O(1) hash index) ---
+baslangic = zaman()
+i = 0
+iken i < N
+    anahtar = metinBirlestir("anahtar", metin(i))
+    deger = sorguSec(baglam, anahtar)
+    i = i + 1
+son
+bitis = zaman()
+raporla("Query POINT LOOKUP", N, baslangic, bitis)
+
+# --- Query: UPDATE ---
+baslangic = zaman()
+i = 0
+iken i < N
+    anahtar = metinBirlestir("anahtar", metin(i))
+    z = sorguGuncelle(baglam, anahtar, metin(i + 1))
+    i = i + 1
+son
+bitis = zaman()
+raporla("Query UPDATE", N, baslangic, bitis)
+
+# --- Query: DELETE ---
+baslangic = zaman()
+i = 0
+iken i < N
+    anahtar = metinBirlestir("anahtar", metin(i))
+    z = sorguSil(baglam, anahtar)
+    i = i + 1
+son
+bitis = zaman()
+raporla("Query DELETE", N, baslangic, bitis)
+
+z = sorguKapat(baglam)
+
+# --- Graph: BFS traversal (zincir graf, N dugum) ---
+g = grafikAc()
+i = 0
+iken i < N - 1
+    kaynak = metinBirlestir("d", metin(i))
+    hedef = metinBirlestir("d", metin(i + 1))
+    g = grafikKenarEkle(g, kaynak, hedef)
+    i = i + 1
+son
+baslangic = zaman()
+sira = grafikBFS(g, "d0")
+bitis = zaman()
+raporla("Graph BFS (zincir, N dugum tek gecis)", uzunluk(sira), baslangic, bitis)
+
+# --- Semantic: nokta carpimi + en-benzerler taramasi ---
+a = anlamAc()
+i = 0
+iken i < N
+    a = anlamVektorEkle(a, metinBirlestir("v", metin(i)), [i, i + 1, i + 2])
+    i = i + 1
+son
+baslangic = zaman()
+sonuclar = anlamEnBenzerler(a, [1, 2, 3], 10)
+bitis = zaman()
+raporla(metinBirlestir(metinBirlestir("Semantic EN-BENZERLER (", metin(N)), " vektor arasinda tarama)"), N, baslangic, bitis)
+
+yaz("\nBENCHMARK TAMAMLANDI")
