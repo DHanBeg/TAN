@@ -1,0 +1,135 @@
+# ============================================================
+# security.tan — VETA Security Core (Zero Trust: authn/authz/audit)
+# ------------------------------------------------------------
+# VETA master prompt Security Core tanımı: "Zero Trust. authentication,
+# authorization, RBAC, tenant isolation, audit, tamper evidence."
+#
+# DÜRÜST KAPSAM (v1):
+#   - RBAC'ın "rol" katmanı YOK — doğrudan kullanıcı->izin eşlemesi
+#     (basitleştirme, TAN'da nested sözlük/struct çalışmadığı için
+#     — bkz VETA_STATUS.md kayıt/sözlük bug'ı). Rol katmanı sonraki iş.
+#   - Şifre hash'i sha256 (gerçek salt/bcrypt YOK, TAN'da o API yok,
+#     kapsam dışı, dürüstçe belirtilir).
+#   - Audit log HASH-CHAIN (tamper-evident) — bu gerçek çalışan bir
+#     özellik: bir kayıt sonradan değiştirilirse zincir doğrulaması
+#     (guvenlikDenetimDogrula) bunu yakalar.
+#
+# Yapı: guvenlik = [kullanicilarHt, izinlerHt, denetimListesi]
+#   kullanicilarHt : HashTablo, kullaniciAdi -> sha256(sifre) (hex)
+#   izinlerHt      : HashTablo, "kullaniciAdi|izin" -> "1"
+#   denetimListesi : dizi, her eleman
+#     [sira, kullaniciAdi, eylem, sonuc, oncekiHash, buKaydinHash]
+#
+# Kullanım:
+#   içe al "veta/libraries/security/source/security.tan"
+#   g = guvenlikAc()
+#   g = guvenlikKullaniciEkle(g, "demir", "sifre123")
+#   ok = guvenlikDogrula(g, "demir", "sifre123")        # 1
+#   g = guvenlikIzinVer(g, "demir", "yaz")
+#   yetkili = guvenlikYetkiliMi(g, "demir", "yaz")       # 1
+#   g = guvenlikDenetimKaydet(g, "demir", "yaz-yapti", "basarili")
+#   zincirSaglam = guvenlikDenetimDogrula(g)             # 1
+#
+# NOT: Yeni dil özelliği/keyword EKLENMEDİ — sadece mevcut TAN dili
+# (işlev/eğer/iken/döndür) kullanıldı (proje kuralı).
+# ============================================================
+
+içe al "kutuphane/ozet.tan"
+içe al "kutuphane/HashTablo.tan"
+içe al "kutuphane/sha256.tan"
+
+# guvenlikAc(): boş güvenlik bağlamı kurar.
+işlev guvenlikAc()
+    döndür [htYeni(), htYeni(), []]
+son
+
+# guvenlikKullaniciEkle(guvenlik, kullaniciAdi, sifre): kullanıcının
+# şifre hash'ini (sha256) kaydeder. YENİ guvenlik döndürür.
+işlev guvenlikKullaniciEkle(guvenlik, kullaniciAdi, sifre)
+    kullanicilarHt = htKoy(guvenlik[0], kullaniciAdi, sha256(sifre))
+    döndür [kullanicilarHt, guvenlik[1], guvenlik[2]]
+son
+
+# guvenlikDogrula(guvenlik, kullaniciAdi, sifre): şifre doğruysa 1,
+# kullanıcı yoksa veya şifre yanlışsa 0 döndürür.
+işlev guvenlikDogrula(guvenlik, kullaniciAdi, sifre)
+    kayitliHash = htAl(guvenlik[0], kullaniciAdi)
+    eğer metinEsit(kayitliHash, "") ise
+        döndür 0
+    son
+    eğer metinEsit(sha256(sifre), kayitliHash) ise
+        döndür 1
+    son
+    döndür 0
+son
+
+# guvenlikIzinVer(guvenlik, kullaniciAdi, izin): kullanıcıya izin
+# tanır ("kullaniciAdi|izin" birleşik anahtarla). YENİ guvenlik döndürür.
+işlev guvenlikIzinVer(guvenlik, kullaniciAdi, izin)
+    anahtar = metinBirlestir(metinBirlestir(kullaniciAdi, "|"), izin)
+    izinlerHt = htKoy(guvenlik[1], anahtar, "1")
+    döndür [guvenlik[0], izinlerHt, guvenlik[2]]
+son
+
+# guvenlikYetkiliMi(guvenlik, kullaniciAdi, izin): kullanıcının bu
+# izne sahip olup olmadığını 1/0 döndürür.
+işlev guvenlikYetkiliMi(guvenlik, kullaniciAdi, izin)
+    anahtar = metinBirlestir(metinBirlestir(kullaniciAdi, "|"), izin)
+    döndür htVarMi(guvenlik[1], anahtar)
+son
+
+# guvenlikDenetimKaydet(guvenlik, kullaniciAdi, eylem, sonuc): yeni
+# denetim kaydı ekler. Her kaydın hash'i (buKaydinHash) kendi alanları
+# + bir önceki kaydın hash'i (oncekiHash) üzerinden hesaplanır — hash
+# chain, tamper-evident. İlk kayıt için oncekiHash = "GENESIS" sabiti.
+# YENİ guvenlik döndürür.
+işlev guvenlikDenetimKaydet(guvenlik, kullaniciAdi, eylem, sonuc)
+    denetim = guvenlik[2]
+    n = uzunluk(denetim)
+    sira = n + 1
+    eğer n == 0 ise
+        oncekiHash = "GENESIS"
+    değilse
+        sonKayit = denetim[n - 1]
+        oncekiHash = metinBirlestir("", sonKayit[5])
+    son
+    gövde = metinBirlestir(metinBirlestir(metinBirlestir(metinBirlestir(metin(sira), kullaniciAdi), eylem), sonuc), oncekiHash)
+    buKaydinHash = sha256(gövde)
+    kayit = [sira, kullaniciAdi, eylem, sonuc, oncekiHash, buKaydinHash]
+    yeniDenetim = ekle(denetim, kayit)
+    döndür [guvenlik[0], guvenlik[1], yeniDenetim]
+son
+
+# guvenlikDenetimDogrula(guvenlik): TÜM hash-chain'i baştan tarar,
+# her kaydın buKaydinHash'ini yeniden hesaplayıp doğrular VE zincir
+# bağlantısının (oncekiHash == bir önceki kaydın buKaydinHash'i)
+# koptuğu yer var mı kontrol eder. Zincir sağlamsa 1, bozuksa/
+# kurcalanmışsa 0 döndürür.
+işlev guvenlikDenetimDogrula(guvenlik)
+    denetim = guvenlik[2]
+    n = uzunluk(denetim)
+    i = 0
+    beklenenOnceki = "GENESIS"
+    sonuc = 1
+    iken i < n
+        kayit = denetim[i]
+        gövde = metinBirlestir(metinBirlestir(metinBirlestir(metinBirlestir(metin(kayit[0]), metinBirlestir("", kayit[1])), metinBirlestir("", kayit[2])), metinBirlestir("", kayit[3])), metinBirlestir("", kayit[4]))
+        hesaplanan = sha256(gövde)
+        kayitliHash = metinBirlestir("", kayit[5])
+        kayitliOnceki = metinBirlestir("", kayit[4])
+        eğer metinEsit(hesaplanan, kayitliHash) değilse
+            sonuc = 0
+        son
+        eğer metinEsit(kayitliOnceki, beklenenOnceki) değilse
+            sonuc = 0
+        son
+        beklenenOnceki = kayitliHash
+        i = i + 1
+    son
+    döndür sonuc
+son
+
+# guvenlikDenetimSayisi(guvenlik): audit log'daki kayıt sayısı.
+işlev guvenlikDenetimSayisi(guvenlik)
+    döndür uzunluk(guvenlik[2])
+son

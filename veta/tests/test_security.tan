@@ -1,0 +1,46 @@
+# test_security.tan — VETA Security Core (guvenlikAc/guvenlikKullaniciEkle/
+# guvenlikDogrula/guvenlikIzinVer/guvenlikYetkiliMi/guvenlikDenetimKaydet/
+# guvenlikDenetimDogrula) testleri.
+
+içe al "kutuphane/test.tan"
+içe al "../libraries/security/source/security.tan"
+
+gecti = 0
+toplam = 0
+
+g = guvenlikAc()
+g = guvenlikKullaniciEkle(g, "demir", "sifre123")
+
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, guvenlikDogrula(g, "demir", "sifre123"), "guvenlikDogrula: dogru sifre kabul ediliyor")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, guvenlikDogrula(g, "demir", "yanlis"), "guvenlikDogrula: yanlis sifre reddediliyor")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, guvenlikDogrula(g, "olmayan", "xxx"), "guvenlikDogrula: olmayan kullanici reddediliyor")
+
+g = guvenlikIzinVer(g, "demir", "yaz")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, guvenlikYetkiliMi(g, "demir", "yaz"), "guvenlikYetkiliMi: verilen izin taniniyor")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, guvenlikYetkiliMi(g, "demir", "sil"), "guvenlikYetkiliMi: verilmemis izin reddediliyor")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, guvenlikYetkiliMi(g, "baskasi", "yaz"), "guvenlikYetkiliMi: baska kullanici izni almiyor")
+
+# audit hash-chain
+g = guvenlikDenetimKaydet(g, "demir", "giris", "basarili")
+g = guvenlikDenetimKaydet(g, "demir", "yaz-yapti", "basarili")
+g = guvenlikDenetimKaydet(g, "baskasi", "giris", "basarisiz")
+
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(3, guvenlikDenetimSayisi(g), "guvenlikDenetimKaydet: 3 kayit eklendi")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, guvenlikDenetimDogrula(g), "guvenlikDenetimDogrula: temiz zincir gecerli")
+
+# KRITIK: zinciri kurcala (bir kaydin sonuc alanini degistir) - dogrulama BOZULMALI
+denetim = g[2]
+kurcalanan = denetim[1]
+kurcalanan[3] = "kurcalandi"
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, guvenlikDenetimDogrula(g), "guvenlikDenetimDogrula: kurcalanan kayit tespit ediliyor")
+
+d = testSonuc(gecti, toplam)

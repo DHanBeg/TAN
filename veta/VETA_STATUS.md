@@ -241,7 +241,22 @@ başlanmadı) + Isolation/2D (tek-thread sınırı hâlâ geçerli).
   KAPSAM DIŞI (dürüst, TAN'da o API yok). Test: `veta/tests/test_memory.tan`
   — 11/11 GEÇTİ (WSL native), LFU tahliyenin doğru anahtarı seçtiği
   doğrulandı.
-- **Durum:** Storage+Query+Event+Memory bitti (tek-node, eşzamanlılık yok). Sıradaki: Security core (kütüphane-seviyesi, derleyiciye dokunmuyor, düşük risk).
+- **Security core** ✅ TAMAMLANDI (2026-08-23) — `veta/libraries/security/source/security.tan`.
+  `guvenlikAc/guvenlikKullaniciEkle/guvenlikDogrula/guvenlikIzinVer/
+  guvenlikYetkiliMi/guvenlikDenetimKaydet/guvenlikDenetimDogrula/
+  guvenlikDenetimSayisi`. sha256 şifre hash + düz kullanıcı->izin
+  (RBAC'ın rol katmanı YOK, v1 basitleştirmesi, dürüst) + **hash-chain
+  audit log (tamper-evident)** — kayıt sonradan değiştirilirse
+  `guvenlikDenetimDogrula` bunu yakalıyor, gerçekten test edildi.
+  Test: `veta/tests/test_security.tan` — 9/9 GEÇTİ (WSL native), kurcalama
+  tespiti dahil.
+  NOT: Bu core'u opencode (big-pickle) yazamadı (3 deneme: ya
+  exploration'da takılıp yazmadan çıktı, ya donup 15+ dk ilerlemedi, ya da
+  TAN olmayan uydurma bir sözdizimi (`fonk()->`, `.` sonlandırıcı) üretti
+  — derlenemezdi). nemotron-3-ultra-free denendi, o da yanlış sözdizimi
+  üretti. Kullanıcı onayıyla bu dosyayı **Claude doğrudan yazdı**
+  (istisna — normal akışta kod yazımı opencode'a bırakılıyor).
+- **Durum:** Storage+Query+Event+Memory+Security bitti (tek-node, eşzamanlılık yok). Sıradaki: Temporal core veya Central Core.
 
 ## Sonraki Adımlar
 
