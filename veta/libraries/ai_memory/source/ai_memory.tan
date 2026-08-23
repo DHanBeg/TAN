@@ -1,0 +1,150 @@
+# ============================================================
+# ai_memory.tan — VETA AI Memory Core (working/episodic/long-term)
+# ------------------------------------------------------------
+# VETA master prompt AI Memory Core tanımı: "working memory, short-term,
+# episodic, semantic, long-term. Lifecycle: capture -> classify -> store
+# -> retrieve -> consolidate -> expire/archive. Security + tenant
+# isolation zorunlu."
+#
+# DÜRÜST KAPSAM (v1): "semantic" bellek katmanı (embedding tabanlı) bu
+# core'da YOK — bunun yerine `veta/libraries/semantic/source/semantic.tan`
+# (Semantic Core) doğrudan kullanılabilir, tekrar yazılmadı (kütüphane-
+# first kuralı: mevcut core'u tekrar üretme). Tenant isolation VE
+# security entegrasyonu (Security Core ile) KAPSAM DIŞI — bu v1 tek-
+# tenant, çağıran isterse `security.tan`'ı KENDİSİ entegre edebilir
+# (composition, bu core zorlamıyor).
+#
+# Mimari (VETA'nın kendi core'larını YENİDEN KULLANIR — "entegre parça"
+# kuralına uygun, ayrı bir dünya değil):
+#   - Working/short-term memory  -> `veta/libraries/memory/source/memory.tan`
+#     (LFU cache, DOĞRUDAN kullanılıyor, tekrar yazılmadı)
+#   - Long-term/episodic memory  -> bu dosyada basit append-only dizi
+#     (consolidate edilmiş anılar — "asla silme" değil, expire edilebilir)
+#
+# Yapı: ab = [kisaSureliBellek, uzunSureliListe, uzunSureliIndeksHt]
+#   kisaSureliBellek  : memory.tan bağlamı (bellekAc(...) çıktısı)
+#   uzunSureliListe   : dizi, [id, icerik, onemSkoru, kayitZamani, aktifMi]
+#   uzunSureliIndeksHt: HashTablo, id -> uzunSureliListe'deki indeks (metin)
+#
+# Lifecycle:
+#   capture     -> aiBellekYakala        (kisa sureli bellege yazar)
+#   retrieve    -> aiBellekGetir         (once kisa sureli, sonra uzun sureli)
+#   consolidate -> aiBellekPekistir      (kisa sureliden uzun sureliye tasir)
+#   expire      -> aiBellekArsivle       (uzun sureliyi aktifMi=0 yapar,
+#                  VERİYİ SİLMEZ — "arşiv" gerçek anlamda korunur)
+#
+# Kullanım:
+#   içe al "veta/libraries/ai_memory/source/ai_memory.tan"
+#   ab = aiBellekAc(50)
+#   ab = aiBellekYakala(ab, "gorusme-1", "kullanici X ile konustuk")
+#   deger = aiBellekGetir(ab, "gorusme-1")       # kisa sureliden
+#   ab = aiBellekPekistir(ab, "gorusme-1", 8)     # onemSkoru=8, uzun sureliye tasi
+#   deger2 = aiBellekGetir(ab, "gorusme-1")      # artik uzun sureliden
+#   ab = aiBellekArsivle(ab, "gorusme-1")
+#   deger3 = aiBellekGetir(ab, "gorusme-1")      # "" (arsivlenmis, aktif degil)
+#
+# NOT: Yeni dil özelliği/keyword EKLENMEDİ — `kayıt`/`sözlük()` KULLANILMADI.
+# HER İFADE TEK SATIRDA, `eğer X değilse` YOK (== 0) — bkz KRİTİK BULGU 2.
+# Float YOK (bkz KRİTİK BULGU 3) — onemSkoru TAM SAYI.
+# ============================================================
+
+içe al "kutuphane/ozet.tan"
+içe al "kutuphane/HashTablo.tan"
+içe al "kutuphane/araclar.tan"
+içe al "kutuphane/tanoku.tan"
+içe al "veta/libraries/memory/source/memory.tan"
+
+# aiBellekAc(kisaSureKapasite): boş AI Memory bağlamı kurar.
+# kisaSureKapasite -> kısa süreli (working memory) LFU cache boyutu.
+işlev aiBellekAc(kisaSureKapasite)
+    döndür [bellekAc(kisaSureKapasite), [], htYeni()]
+son
+
+# aiBellekYakala(ab, id, icerik): "capture" — kısa süreli belleğe
+# (working memory) yazar. YENİ ab döndürür.
+işlev aiBellekYakala(ab, id, icerik)
+    kisaSureli = bellekKoy(ab[0], id, icerik)
+    döndür [kisaSureli, ab[1], ab[2]]
+son
+
+# aiBellekGetir(ab, id): "retrieve" — önce kısa süreli bellekte arar,
+# yoksa uzun süreli belleğe bakar (SADECE aktif/arşivlenmemiş kayıtlar).
+# Bulunamazsa "" döner.
+işlev aiBellekGetir(ab, id)
+    kisaSureliDeger = bellekAl(ab[0], id)
+    eğer metinEsit(kisaSureliDeger, "") == 0 ise
+        döndür kisaSureliDeger
+    son
+    indeksStr = htAl(ab[2], id)
+    eğer metinEsit(indeksStr, "") ise
+        döndür ""
+    son
+    indeks = metneTam(indeksStr)
+    kayit = ab[1][indeks]
+    aktifMi = kayit[4]
+    eğer aktifMi == 0 ise
+        döndür ""
+    son
+    döndür kayit[1]
+son
+
+# aiBellekPekistir(ab, id, onemSkoru): "consolidate" — id kısa süreli
+# bellekte VARSA, içeriğini uzun süreli belleğe (episodic/long-term)
+# TAŞIR (kısa süreliden silinir, uzun süreliye eklenir — zaten uzun
+# süreliyse üzerine yazar/günceller). Kısa süreli bellekte yoksa ab'yi
+# değiştirmeden döndürür. YENİ ab döndürür.
+işlev aiBellekPekistir(ab, id, onemSkoru)
+    icerik = bellekAl(ab[0], id)
+    eğer metinEsit(icerik, "") ise
+        döndür ab
+    son
+    kisaSureli = bellekSil(ab[0], id)
+    uzunSureliListe = ab[1]
+    indeksHt = ab[2]
+    mevcutIndeksStr = htAl(indeksHt, id)
+    yeniKayit = [id, icerik, onemSkoru, zaman(), 1]
+    eğer metinEsit(mevcutIndeksStr, "") == 0 ise
+        mevcutIndeks = metneTam(mevcutIndeksStr)
+        uzunSureliListe[mevcutIndeks] = yeniKayit
+    değilse
+        yeniIndeks = uzunluk(uzunSureliListe)
+        uzunSureliListe = ekle(uzunSureliListe, yeniKayit)
+        indeksHt = htKoy(indeksHt, id, metin(yeniIndeks))
+    son
+    döndür [kisaSureli, uzunSureliListe, indeksHt]
+son
+
+# aiBellekArsivle(ab, id): "expire/archive" — uzun süreli bellekteki
+# kaydı aktifMi=0 yapar (VERİYİ SİLMEZ, sadece aktif-değil işaretler —
+# arşiv kalıcı, sorgulanabilir kalır, sadece aiBellekGetir onu
+# döndürmez). id uzun süreli bellekte yoksa ab'yi değiştirmeden döndürür.
+işlev aiBellekArsivle(ab, id)
+    indeksStr = htAl(ab[2], id)
+    eğer metinEsit(indeksStr, "") ise
+        döndür ab
+    son
+    indeks = metneTam(indeksStr)
+    uzunSureliListe = ab[1]
+    kayit = uzunSureliListe[indeks]
+    kayit[4] = 0
+    döndür [ab[0], uzunSureliListe, ab[2]]
+son
+
+# aiBellekUzunSureliOnemi(ab, id): id'nin uzun süreli bellekteki önem
+# skorunu döndürür (yoksa 0 - 1, "bulunamadı" anlamına gelir).
+işlev aiBellekUzunSureliOnemi(ab, id)
+    indeksStr = htAl(ab[2], id)
+    eğer metinEsit(indeksStr, "") ise
+        döndür 0 - 1
+    son
+    indeks = metneTam(indeksStr)
+    kayit = ab[1][indeks]
+    döndür kayit[2]
+son
+
+# aiBellekUzunSureliSayisi(ab): uzun süreli bellekteki TOPLAM kayıt
+# sayısı (arşivlenmiş dahil — "asla silme" ilkesi, bkz Temporal core
+# ile aynı felsefe).
+işlev aiBellekUzunSureliSayisi(ab)
+    döndür uzunluk(ab[1])
+son

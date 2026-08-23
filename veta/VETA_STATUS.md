@@ -352,7 +352,22 @@ başlanmadı) + Isolation/2D (tek-thread sınırı hâlâ geçerli).
   yazılırken KRİTİK BULGU 3 keşfedildi (orijinal kosinüs tasarımı
   sıfıra bölme hatasına düştü, kök neden izole edilip belgelenip
   tasarım tam sayıya çevrildi).
-- **Durum:** Storage+Query+Event+Memory+Security+Temporal+Observability+Graph+Semantic bitti (tek-node, eşzamanlılık yok, float fonksiyonlar bozuk). Sıradaki: Central Core veya Distributed/AI Memory/Optimizer/Plugin/Autonomy/Evolution (hepsi sıfır kod).
+- **AI Memory core** ✅ TAMAMLANDI (2026-08-23) — `veta/libraries/ai_memory/source/ai_memory.tan`.
+  Lifecycle tam: `aiBellekYakala`(capture)→`aiBellekGetir`(retrieve)→
+  `aiBellekPekistir`(consolidate)→`aiBellekArsivle`(expire/archive).
+  **Memory core'u working/short-term katman olarak DOĞRUDAN yeniden
+  kullanıyor** (composition — VETA'nın kendi core'ları birbirinin üstüne
+  kuruluyor, master prompt'un istediği gibi). Uzun süreli/episodic
+  bellek: append-only dizi + HashTablo indeks, "asla silme" (arşivleme
+  sadece aktifMi=0 işaretler, Temporal core ile aynı felsefe). "Semantic"
+  bellek katmanı KAPSAM DIŞI — bunun yerine Semantic Core (`anlam*`
+  fonksiyonları) ayrıca/birlikte kullanılabilir, tekrar yazılmadı.
+  Security/tenant-isolation entegrasyonu KAPSAM DIŞI (composition ile
+  Security Core eklenebilir, zorlanmıyor). Test:
+  `veta/tests/test_ai_memory.tan` — 14/14 GEÇTİ (WSL native), consolidate
+  sırasında kısa-süreli bellekten silinme + tekrar-pekiştirmede liste
+  büyümeden güncelleme + arşivlemenin veriyi silmediği doğrulandı.
+- **Durum:** Storage+Query+Event+Memory+Security+Temporal+Observability+Graph+Semantic+AI Memory bitti (tek-node, eşzamanlılık yok, float fonksiyonlar bozuk). Sıradaki: Central Core veya Distributed/Optimizer/Plugin/Autonomy/Evolution (hepsi sıfır kod).
 
 ## Sonraki Adımlar
 

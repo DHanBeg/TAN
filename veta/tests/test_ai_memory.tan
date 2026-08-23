@@ -1,0 +1,65 @@
+# test_ai_memory.tan — VETA AI Memory Core testleri.
+# capture -> retrieve -> consolidate -> expire/archive lifecycle.
+
+içe al "kutuphane/test.tan"
+içe al "../libraries/ai_memory/source/ai_memory.tan"
+
+gecti = 0
+toplam = 0
+
+ab = aiBellekAc(10)
+
+# capture
+ab = aiBellekYakala(ab, "gorusme-1", "kullanici X ile konustuk")
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("kullanici X ile konustuk", aiBellekGetir(ab, "gorusme-1"), "aiBellekYakala/Getir: kisa sureli bellekten dogru okunuyor")
+
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("", aiBellekGetir(ab, "olmayan"), "aiBellekGetir: olmayan id bos donuyor")
+
+# consolidate - kisa sureliden uzun sureliye tasi
+ab = aiBellekPekistir(ab, "gorusme-1", 8)
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("kullanici X ile konustuk", aiBellekGetir(ab, "gorusme-1"), "aiBellekPekistir: tasindiktan sonra hala okunuyor (uzun sureliden)")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(8, aiBellekUzunSureliOnemi(ab, "gorusme-1"), "aiBellekPekistir: onem skoru dogru kaydedildi")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, aiBellekUzunSureliSayisi(ab), "aiBellekPekistir: uzun sureli bellek 1 kayit iceriyor")
+
+# pekistirilen kayit kisa sureliden SILINMIS olmali
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, bellekIcindeMi(ab[0], "gorusme-1"), "aiBellekPekistir: kisa sureli bellekten silindi")
+
+# olmayan id'yi pekistirmeye calismak - ab degismemeli
+ab = aiBellekPekistir(ab, "olmayan-capture", 5)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, aiBellekUzunSureliSayisi(ab), "aiBellekPekistir: olmayan kisa-sureli kayit sessizce yok sayiliyor")
+
+# ikinci bir anı yakala + pekistir
+ab = aiBellekYakala(ab, "gorusme-2", "ikinci gorusme notu")
+ab = aiBellekPekistir(ab, "gorusme-2", 3)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(2, aiBellekUzunSureliSayisi(ab), "aiBellekPekistir: ikinci kayit da eklendi, toplam 2")
+
+# tekrar pekistirme (guncelleme) - ayni id, yeni onem skoru, LISTE BUYUMEMELI
+ab = aiBellekYakala(ab, "gorusme-1", "guncellenmis icerik")
+ab = aiBellekPekistir(ab, "gorusme-1", 9)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(2, aiBellekUzunSureliSayisi(ab), "aiBellekPekistir: ayni id tekrar pekistirilince liste buyumuyor (guncelleniyor)")
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("guncellenmis icerik", aiBellekGetir(ab, "gorusme-1"), "aiBellekPekistir: guncellenen icerik dogru")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(9, aiBellekUzunSureliOnemi(ab, "gorusme-1"), "aiBellekPekistir: guncellenen onem skoru dogru")
+
+# expire/archive
+ab = aiBellekArsivle(ab, "gorusme-2")
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("", aiBellekGetir(ab, "gorusme-2"), "aiBellekArsivle: arsivlenen kayit artik getirilmiyor")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(2, aiBellekUzunSureliSayisi(ab), "aiBellekArsivle: kayit SILINMEDI, sayim hala 2 (asla silme)")
+
+# arsivlenmemis kayit (gorusme-1) hala erisilebilir olmali
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("guncellenmis icerik", aiBellekGetir(ab, "gorusme-1"), "aiBellekArsivle: arsivlenmemis kayit etkilenmedi")
+
+d = testSonuc(gecti, toplam)
