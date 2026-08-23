@@ -1,9 +1,44 @@
-# test_query.tan — VETA Query (parser, planlayıcı, executor) smoke test
-# Kompilasyon: qemu-x86_64 TancElf <bu_dosya> <cikti>
-# Çalıştırma:  qemu-x86_64 <cikti>
-# Kural: mevcut TancElf binary'sini kullan; Faz 6 zemini (Storage hazır); QEMU throttle toleranı.
+# test_query.tan — VETA Query (sorguAc/sorguEkle/sorguSec/sorguKapat) testleri.
+# Kalip: testler/storage_testleri.tan (gecti/toplam + iddiaSayi/iddiaMetin +
+# fdTemiz header-bozma deseni — unlink syscall'i 2B kapsaminda yok, onceki
+# calistirmadan kalinti dosyayi "yeni dosya" gibi algilatmak icin magic bozulur).
 
+içe al "kutuphane/test.tan"
 içe al "../libraries/query/source/query.tan"
 
-# Basit query testi
-yaz("Query Test: Basarili\n")
+gecti = 0
+toplam = 0
+
+# dosyayi temizlemek icin (onceki calistirmadan kalinti kalmasin):
+# hem .db hem .wal icin fdTemiz deseni (header magic'i boz)
+fdTemiz1 = dosyaAc("/tmp/tan_test_query.db", 1)
+z = dosyaYazKonum(fdTemiz1, 0, "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+z = dosyaKapat(fdTemiz1)
+fdTemiz2 = dosyaAc("/tmp/tan_test_query.wal", 1)
+z = dosyaYazKonum(fdTemiz2, 0, "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+z = dosyaKapat(fdTemiz2)
+
+baglam = sorguAc("/tmp/tan_test_query.db")
+no1 = sorguEkle(baglam, "ad", "demir")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, no1, "sorguEkle: ilk kayit sayfa no=1")
+deger1 = sorguSec(baglam, "ad")
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("demir", deger1, "sorguSec: eklenen key dogru deger donduruyor")
+
+# ikinci farkli key ekle, birbirine karismadigini dogrula
+no2 = sorguEkle(baglam, "sehir", "istanbul")
+deger2 = sorguSec(baglam, "sehir")
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("istanbul", deger2, "sorguSec: ikinci key kendi degerini donduruyor")
+deger1tekrar = sorguSec(baglam, "ad")
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("demir", deger1tekrar, "sorguSec: ilk key ikinci ekleme sonrasi hala dogru")
+
+# olmayan key
+degerYok = sorguSec(baglam, "olmayan")
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("", degerYok, "sorguSec: olmayan key bos metin donduruyor")
+
+z = sorguKapat(baglam)
+d = testSonuc(gecti, toplam)

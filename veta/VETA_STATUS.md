@@ -162,11 +162,27 @@
   riski yok, ama yine de tam regresyon (TestArkaUcGoSuzTemiz.sh,
   TestFormatIdempotent) yeşil doğrulandı.
 
-#### Query (Sorgu) — YOK (Storage'ın üzerine kurulacak, henüz başlanmadı)
-- `libraries/query/source/query.tan`: **SIFIR gerçek kod**, tamamı yorum/
-  tasarım notu. Storage artık HAZIR (yukarı bakın) — Query artık
-  gerçekten başlanabilir, ama bu oturumda YAZILMADI.
-- **Gerçek durum:** Tasarım var, implementasyon yok. Sıradaki adım.
+#### Query (Sorgu) — MİNİMAL DİLİM UYGULANDI (2026-08-23, gerçekten çalıştırıldı)
+- `libraries/query/source/query.tan`: eski tasarım yorumu KORUNDU, altına
+  gerçek kod eklendi. Tam SQL parser DEĞİL — basit fonksiyon API'si:
+  `sorguAc(yol)`, `sorguEkle(baglam, key, deger)`, `sorguSec(baglam, key)`,
+  `sorguKapat(baglam)`. PageManager üzerine kurulu: her key-değer çifti
+  kendi sayfasında (`key + karakter(1) + değer`), arama **linear tarama**
+  (index YOK — her `sorguSec` tüm veri sayfalarını gezer, küçük/orta
+  ölçek için yeterli, büyük ölçekte O(n) maliyeti var, ayrı iş).
+- **Doğrulama:** `veta/tests/test_query.tan` — 5/5 GEÇTİ (ekle+seç, iki
+  farklı key'in karışmaması, olmayan key → boş metin). WSL native ortamda
+  `TancElf` ile derlendi ve gerçekten çalıştırıldı (çıktı: "TUM TESTLER
+  GECTI"). Kendi kendine barındırma (self-hosting) sabit noktası
+  (`TancElf`/`gen1`/`gen2`/`gen3`) bu turda DOKUNULMADI, `gen1==gen2==gen3`
+  doğrulandı (değişmedi).
+- **Dürüst sınır:** Transaction (Islem.tan) kullanılıyor ama Isolation
+  yok (tek-thread), fsync yok (2B'nin sınırı miras). Index/hash tablosu
+  entegrasyonu (kutuphane/HashTablo.tan, 2A) YOK — linear tarama bilinçli
+  bir basitleştirme, sonraki iş.
+- **Kalan:** UPDATE/DELETE yok (sadece ekle/seç), index'leme yok, WHERE/
+  SQL sözdizimi yok — bunlar bilinçli olarak bu minimal dilimin dışında
+  bırakıldı.
 
 #### Transaction (İşlem) — Storage seviyesinde ÇÖZÜLDÜ (`kutuphane/Islem.tan`)
 - Eski `transaction.tan`/`transaction_detail.tan` (tasarım notu, sıfır kod)

@@ -36,3 +36,139 @@
 # QueryHata(hataMesajı):
 # - Query hatasında döndür
 # - Hata mesajını çıktıya yaz
+
+içe al "kutuphane/PageManager.tan"
+içe al "kutuphane/Islem.tan"
+
+# ============================================================
+# Minimal Query katmanı — basit fonksiyon API'si (tam SQL
+# parser DEĞİL). Her key-deger çifti kendi sayfasında saklanır:
+# sayfa icerigi = key + karakter(1) + deger (ayraç ASCII 0x01,
+# key/deger icinde geçmez varsayımı). Sayfa 4096 bayta
+# pmSayfaYaz tarafından karakter(0) ile doldurulur.
+#
+# Kullanım:
+#   içe al "veta/libraries/query/source/query.tan"
+#   baglam = sorguAc("veri.db")       # [pm, wal, txSayacKutu]
+#   no = sorguEkle(baglam, "anahtar", "deger")   # sayfa no döner
+#   deger = sorguSec(baglam, "anahtar")          # linear tarama
+#   # bulunamadıysa "" (bos metin) döner — cagiran bos dönüşü
+#   # 'bulunamadi' olarak yorumlar (bu modülün konvansiyonu).
+#   z = sorguKapat(baglam)
+#
+# NOT: Yeni dil özelliği/keyword EKLENMEDİ — sadece mevcut TAN
+# dili (işlev/eğer/iken/döndür) kullanıldı (proje kuralı).
+# ============================================================
+
+# sorguAc(yol): veritabanını açar/oluşturur.
+# Döner: [pm, wal, txSayacKutu] — txSayacKutu = [1] mutable kutu,
+# her işlemde (sorguEkle) bir artırılır ve islemBaslat'a txId
+# olarak beslenir (Islem.tan kapsam sınırı: çağıran sayacı tutar).
+işlev sorguAc(yol)
+    pm = pmAc(yol)
+    wal = walAc(yol)
+    döndür [pm, wal, [1]]
+son
+
+# sorguKapat(baglam): pm'i kapatır, 0 döner.
+işlev sorguKapat(baglam)
+    pm = baglam[0]
+    z = pmKapat(pm)
+    döndür 0
+son
+
+# sorguEkle(baglam, key, deger): key-deger çiftini transaction
+# içinde YENİ bir sayfaya yazar, sayfa numarasını döndürür
+# (cagiran isterse saklar; sorguSec index tutmaz, linear tarar).
+işlev sorguEkle(baglam, key, deger)
+    pm = baglam[0]
+    wal = baglam[1]
+    txKutu = baglam[2]
+    txId = txKutu[0]
+    txKutu[0] = txId + 1
+    tx = islemBaslat(pm, wal, txId)
+    no = pmSayfaAyir(pm)
+    icerik = metinBirlestir(metinBirlestir(key, karakter(1)), deger)
+    lsn = islemSayfaYaz(tx, no, icerik)
+    z = islemCommit(tx)
+    döndür no
+son
+
+# Yardımcı: sayfa icerigindeki kaydın KEY kısmını döndürür
+# (ilk karakter(1)'e kadarki bölüm). Ayraç yoksa (bozuk/bos
+# sayfa) "" döner — böyle bir key arayanla eşleşmez diye
+# kasıtlı: gerçek key'de karakter(1) geçmez varsayımı var.
+işlev sayfaKeyOku(icerik)
+    n = uzunluk(icerik)
+    sonuc = ""
+    i = 0
+    bulundu = 0
+    iken bulundu == 0 ve i < n
+        k = kod(metinAl(icerik, i))
+        eğer k == 1 ise
+            bulundu = 1
+        değilse eğer k == 0 ise
+            i = n
+        değilse
+            sonuc = metinBirlestir(sonuc, metinAl(icerik, i))
+            i = i + 1
+        son
+    son
+    eğer bulundu == 1 ise
+        döndür sonuc
+    değilse
+        döndür ""
+    son
+son
+
+# Yardımcı: sayfa icerigindeki kaydın DEGER kısmını döndürür
+# (ayraçtan sonra, ilk karakter(0)'a kadar — sondaki sıfır-byte
+# dolgusu bu şekilde doğal olarak kırpılmış olur).
+işlev sayfaDegerOku(icerik)
+    n = uzunluk(icerik)
+    sonuc = ""
+    i = 0
+    ayracGecti = 0
+    iken i < n
+        k = kod(metinAl(icerik, i))
+        eğer ayracGecti == 0 ise
+            eğer k == 1 ise
+                ayracGecti = 1
+                i = i + 1
+            değilse eğer k == 0 ise
+                i = n
+            değilse
+                i = i + 1
+            son
+        değilse
+            eğer k == 0 ise
+                i = n
+            değilse
+                sonuc = metinBirlestir(sonuc, metinAl(icerik, i))
+                i = i + 1
+            son
+        son
+    son
+    döndür sonuc
+son
+
+# sorguSec(baglam, key): veri sayfalarını (1..n-1) linear tarar,
+# okunan key aranan key'e eşitse (metinEsit) değerini döndürür;
+# bulunamazsa "" (bos metin) döner.
+işlev sorguSec(baglam, key)
+    pm = baglam[0]
+    n = pmSayfaSayisi(pm)
+    sonuc = ""
+    i = 1
+    iken i < n
+        icerik = pmSayfaOku(pm, i)
+        okunanKey = sayfaKeyOku(icerik)
+        eğer metinEsit(okunanKey, key) ise
+            sonuc = sayfaDegerOku(icerik)
+            i = n
+        değilse
+            i = i + 1
+        son
+    son
+    döndür sonuc
+son
