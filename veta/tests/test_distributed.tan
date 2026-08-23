@@ -1,0 +1,80 @@
+# test_distributed.tan — VETA Distributed Core testleri.
+# Node registry, health, quorum hesaplama, terim-tabanli lider secimi.
+
+içe al "kutuphane/test.tan"
+içe al "../libraries/distributed/source/distributed.tan"
+
+gecti = 0
+toplam = 0
+
+d = dagitikAc()
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("", dagitikLiderKim(d), "dagitikAc: baslangicta lider yok")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, dagitikQuorumSaglaniyorMu(d), "dagitikQuorumSaglaniyorMu: hic node yokken quorum yok")
+
+d = dagitikNodeEkle(d, "node-1", "10.0.0.1:9000")
+d = dagitikNodeEkle(d, "node-2", "10.0.0.2:9000")
+d = dagitikNodeEkle(d, "node-3", "10.0.0.3:9000")
+
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(3, dagitikNodeSayisi(d), "dagitikNodeEkle: 3 node kayitli")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, dagitikNodeDurumu(d, "node-1"), "dagitikNodeEkle: yeni node AKTIF(1) baslar")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(3, dagitikAktifNodeSayisi(d), "dagitikAktifNodeSayisi: hepsi aktif")
+
+# 3/3 aktif -> quorum var
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, dagitikQuorumSaglaniyorMu(d), "dagitikQuorumSaglaniyorMu: 3/3 aktif, quorum var")
+
+# bir node dustu (2/3 aktif, hala coguluk)
+d = dagitikNodeDurumGuncelle(d, "node-2", 3)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(3, dagitikNodeDurumu(d, "node-2"), "dagitikNodeDurumGuncelle: node-2 DUSTU(3)")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(2, dagitikAktifNodeSayisi(d), "dagitikAktifNodeSayisi: 2 aktif kaldi")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, dagitikQuorumSaglaniyorMu(d), "dagitikQuorumSaglaniyorMu: 2/3 aktif, hala coguluk (quorum var)")
+
+# ikinci node de dustu (1/3 aktif, artik coguluk yok)
+d = dagitikNodeDurumGuncelle(d, "node-3", 2)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, dagitikAktifNodeSayisi(d), "dagitikAktifNodeSayisi: sadece 1 aktif kaldi")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, dagitikQuorumSaglaniyorMu(d), "dagitikQuorumSaglaniyorMu: 1/3 aktif, coguluk YOK")
+
+# lider secimi
+d = dagitikLiderSec(d, "node-1", 1)
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("node-1", dagitikLiderKim(d), "dagitikLiderSec: node-1 terim=1 ile lider oldu")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, dagitikLiderAktifMi(d), "dagitikLiderAktifMi: lider aktif")
+
+# dusuk/esit terimli aday reddedilmeli (split-brain korumasi)
+d = dagitikLiderSec(d, "node-3", 1)
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("node-1", dagitikLiderKim(d), "dagitikLiderSec: esit terimli aday reddedildi, lider hala node-1")
+
+# DUSMUS bir node lider olmaya calisirsa reddedilmeli (aktif degil)
+d = dagitikLiderSec(d, "node-2", 5)
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("node-1", dagitikLiderKim(d), "dagitikLiderSec: dusmus (AKTIF olmayan) node aday olamiyor")
+
+# daha yuksek terimli aday kazanmali (node-3'u once tekrar AKTIF yap,
+# SUSPECT durumundaydi - dusmus/supheli node aday olamaz kurali)
+d = dagitikNodeDurumGuncelle(d, "node-3", 1)
+d = dagitikLiderSec(d, "node-3", 7)
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("node-3", dagitikLiderKim(d), "dagitikLiderSec: daha yuksek terimli aktif node lider oluyor")
+
+# lider dusunce dagitikLiderAktifMi bunu yansitmali
+d = dagitikNodeDurumGuncelle(d, "node-3", 3)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, dagitikLiderAktifMi(d), "dagitikLiderAktifMi: lider dustukten sonra 0 donuyor (failover tetiklenmeli)")
+
+# olmayan node
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0 - 1, dagitikNodeDurumu(d, "olmayan"), "dagitikNodeDurumu: olmayan node icin -1")
+
+d = testSonuc(gecti, toplam)

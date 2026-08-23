@@ -432,7 +432,29 @@ başlanmadı) + Isolation/2D (tek-thread sınırı hâlâ geçerli).
   aşamadan (1/2/3/4) acil durdurma yapabiliyor. Gerçek deney/kıyaslama/
   gölge-trafik çalıştırma KAPSAM DIŞI (SIMULATE sınırıyla tutarlı).
   Test: `veta/tests/test_evolution.tan` — 13/13 GEÇTİ (WSL native).
-- **Durum:** 15/16 core'da gerçek kod var — Storage+Query+Event+Memory+Security+Temporal+Observability+Graph+Semantic+AI Memory+Central Core+Optimizer+Plugin+Autonomy+Evolution (tek-node, eşzamanlılık yok, float fonksiyonlar bozuk, dinamik dispatch yok). Sıradaki (SON core): Distributed. Kalan: Frontend (kısmi iskelet var, doğrulanmadı), 2D eşzamanlılık (derleyici işi, ayrı).
+- **Distributed core** ✅ TAMAMLANDI (2026-08-23) — `veta/libraries/distributed/source/distributed.tan`.
+  `dagitikAc/dagitikNodeEkle/dagitikNodeDurumGuncelle/dagitikNodeDurumu/
+  dagitikNodeSayisi/dagitikAktifNodeSayisi/dagitikQuorumSaglaniyorMu/
+  dagitikLiderSec/dagitikLiderKim/dagitikLiderAktifMi`. Master prompt'un
+  kendi "önce single-node temel" kuralına uyularak: node registry +
+  sağlık durumu + ÇOĞUNLUK (majority) quorum hesaplaması (tam sayı
+  aritmetiği: `aktif*2 > toplam`) + terim-tabanlı basit lider seçimi
+  (Raft'ın election-term fikrinden esinlenilmiş, gerçek Raft/Paxos
+  DEĞİL — split-brain'i azaltan "sadece daha yüksek terim kazanır" +
+  "sadece aktif node aday olabilir" kuralları test edildi). Gerçek ağ
+  I/O, replication lag, multi-region, distributed transaction KAPSAM
+  DIŞI (TAN'da soket yerleşikleri var ama çok-node koordinasyon ayrı,
+  büyük bir iş). Test: `veta/tests/test_distributed.tan` — 18/18 GEÇTİ
+  (WSL native) — quorum kaybı senaryosu (3/3→2/3→1/3), düşmüş lider
+  tespiti (failover tetikleme sinyali) dahil.
+- **Durum: 16/16 VETA core'unda gerçek, test edilmiş kod var** —
+  Storage+Query+Event+Memory+Security+Temporal+Observability+Graph+
+  Semantic+AI Memory+Central Core+Optimizer+Plugin+Autonomy+Evolution+
+  Distributed (hepsi tek-node, eşzamanlılık yok — 2D derleyici işi ayrı,
+  float fonksiyonlar bozuk — KRİTİK BULGU 3, dinamik dispatch yok —
+  TAN'da fonksiyon-değeri yok). Kalan: Frontend (kısmi iskelet var,
+  bu oturumda doğrulanmadı), 2D eşzamanlılık (derleyici-seviyesi,
+  ÇOK YÜKSEK karmaşıklık, ayrı dikkatli oturum gerektirir).
 
 ## Sonraki Adımlar
 

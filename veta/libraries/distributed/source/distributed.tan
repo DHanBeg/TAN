@@ -1,0 +1,190 @@
+# ============================================================
+# distributed.tan — VETA Distributed Core (node registry, health,
+# quorum, basit lider seçimi)
+# ------------------------------------------------------------
+# VETA master prompt Distributed Core tanımı: "node discovery,
+# replication, leader/follower, failover, partition handling, consensus,
+# quorum, distributed transactions, multi-region, recovery. Önce
+# single-node temel."
+#
+# DÜRÜST KAPSAM (v1): Master prompt'un kendi kuralına uyarak SADECE
+# "single-node temel" — node KAYIT DEFTERİ, sağlık durumu takibi, ÇOĞUNLUK
+# (majority) quorum HESAPLAMASI ve basit terim-tabanlı lider seçimi.
+# GERÇEK AĞ İLETİŞİMİ (TAN'da soket yerleşikleri VAR — soketAc/soketBagla/
+# soketYaz/soketOku — ama gerçek çok-node koordinasyonu, timeout, partition
+# detection AYRI ve büyük bir iştir, KAPSAM DIŞI). Gerçek konsensüs
+# algoritması (Raft/Paxos) YOK — "en yüksek terimli aktif node kazanır"
+# kuralı kullanılıyor (Raft'ın election-term fikrinden esinlenilmiş
+# basitleştirme, gerçek Raft'ın log-replication/RPC kısmı YOK). Replication
+# lag/multi-region/distributed-transaction KAPSAM DIŞI.
+#
+# Yapı: d = [nodelarListesi, nodeIndeksHt, liderIdKutu]
+#   nodelarListesi : dizi [nodeId, adres, durum, terim]
+#     (durum: 0=bilinmiyor, 1=aktif, 2=suspect, 3=down)
+#   nodeIndeksHt   : HashTablo, nodeId -> nodelarListesi indeksi
+#   liderIdKutu    : [nodeId] mutable kutu, şu anki lider ("" ise yok)
+#
+# Kullanım:
+#   içe al "veta/libraries/distributed/source/distributed.tan"
+#   d = dagitikAc()
+#   d = dagitikNodeEkle(d, "node-1", "10.0.0.1:9000")
+#   d = dagitikNodeEkle(d, "node-2", "10.0.0.2:9000")
+#   d = dagitikNodeEkle(d, "node-3", "10.0.0.3:9000")
+#   varMi = dagitikQuorumSaglaniyorMu(d)          # 1 (3/3 aktif > yarisi)
+#   d = dagitikNodeDurumGuncelle(d, "node-2", 3)  # node-2 dustu (down)
+#   varMi2 = dagitikQuorumSaglaniyorMu(d)         # hala 1 (2/3 > yarisi)
+#   d = dagitikLiderSec(d, "node-1", 1)            # terim=1 ile aday ol
+#   lider = dagitikLiderKim(d)                     # "node-1"
+#
+# NOT: Yeni dil özelliği/keyword EKLENMEDİ. `kayıt`/`sözlük()` KULLANILMADI.
+# HER İFADE TEK SATIRDA, `eğer X değilse` YOK (== 0) — bkz KRİTİK BULGU 2.
+# Float YOK (bkz KRİTİK BULGU 3).
+# ============================================================
+
+içe al "kutuphane/ozet.tan"
+içe al "kutuphane/HashTablo.tan"
+içe al "kutuphane/araclar.tan"
+
+# dagitikAc(): boş Distributed Core bağlamı kurar.
+işlev dagitikAc()
+    döndür [[], htYeni(), [""]]
+son
+
+# dagitikNodeEkle(d, nodeId, adres): "node discovery" — yeni bir node
+# kaydeder (durum=1 AKTIF, terim=0). nodeId zaten kayıtlıysa DEĞİŞTİRMEDEN
+# döner (idempotent). YENİ d döndürür.
+işlev dagitikNodeEkle(d, nodeId, adres)
+    mevcutIndeksStr = htAl(d[1], nodeId)
+    eğer metinEsit(mevcutIndeksStr, "") == 0 ise
+        döndür d
+    son
+    nodelarListesi = d[0]
+    kayit = [nodeId, adres, 1, 0]
+    nodelarListesi = ekle(nodelarListesi, kayit)
+    indeksHt = htKoy(d[1], nodeId, metin(uzunluk(nodelarListesi) - 1))
+    döndür [nodelarListesi, indeksHt, d[2]]
+son
+
+# dagitikNodeDurumGuncelle(d, nodeId, yeniDurum): "failover / health"
+# — bir node'un sağlık durumunu günceller (0=bilinmiyor, 1=aktif,
+# 2=şüpheli, 3=düştü). nodeId bulunamazsa d'yi değiştirmeden döndürür.
+işlev dagitikNodeDurumGuncelle(d, nodeId, yeniDurum)
+    indeksStr = htAl(d[1], nodeId)
+    eğer metinEsit(indeksStr, "") ise
+        döndür d
+    son
+    indeks = metneTam(indeksStr)
+    nodelarListesi = d[0]
+    kayit = nodelarListesi[indeks]
+    kayit[2] = yeniDurum
+    döndür d
+son
+
+# dagitikNodeDurumu(d, nodeId): node'un sağlık durumunu döndürür,
+# bulunamazsa 0-1.
+işlev dagitikNodeDurumu(d, nodeId)
+    indeksStr = htAl(d[1], nodeId)
+    eğer metinEsit(indeksStr, "") ise
+        döndür 0 - 1
+    son
+    indeks = metneTam(indeksStr)
+    nodelarListesi = d[0]
+    kayit = nodelarListesi[indeks]
+    döndür kayit[2]
+son
+
+# dagitikNodeSayisi(d): toplam kayıtlı node sayısı (durumu ne olursa olsun).
+işlev dagitikNodeSayisi(d)
+    döndür uzunluk(d[0])
+son
+
+# dagitikAktifNodeSayisi(d): durum=1(AKTIF) olan node sayısı.
+işlev dagitikAktifNodeSayisi(d)
+    nodelarListesi = d[0]
+    n = uzunluk(nodelarListesi)
+    sayac = 0
+    i = 0
+    iken i < n
+        kayit = nodelarListesi[i]
+        eğer kayit[2] == 1 ise
+            sayac = sayac + 1
+        son
+        i = i + 1
+    son
+    döndür sayac
+son
+
+# dagitikQuorumSaglaniyorMu(d): "quorum" — AKTİF node sayısı, TOPLAM
+# node sayısının ÇOĞUNLUĞUNU (kesin yarısından fazlasını) oluşturuyorsa
+# 1, değilse 0 döndürür. Hiç node yoksa 0 (quorum yok — boş küme
+# çoğunluk sayılmaz, güvenli varsayılan). Tam sayı aritmetiğiyle
+# (float yok, KRİTİK BULGU 3): aktif*2 > toplam ise çoğunluk sağlanmış
+# demektir (ör. 2/3: 2*2=4 > 3 ✓; 1/3: 1*2=2 > 3 ✗).
+işlev dagitikQuorumSaglaniyorMu(d)
+    toplam = dagitikNodeSayisi(d)
+    eğer toplam == 0 ise
+        döndür 0
+    son
+    aktif = dagitikAktifNodeSayisi(d)
+    eğer aktif * 2 > toplam ise
+        döndür 1
+    son
+    döndür 0
+son
+
+# dagitikLiderSec(d, nodeId, terim): basit terim-tabanlı lider seçimi
+# (Raft'ın election-term fikrinden esinlenilmiş, gerçek Raft/Paxos
+# DEĞİL). nodeId AKTİF (durum=1) bir node DEĞİLSE aday olamaz, d
+# değişmeden döner. nodeId'nin terimi, mevcut liderin terimi ile
+# KARŞILAŞTIRILIR — sadece terim STRICT olarak daha yüksekse yeni
+# lider olur (aynı/düşük terimli adaylar reddedilir — "split brain"
+# riskini azaltan temel kural). Node'un kendi terim alanı da güncellenir.
+işlev dagitikLiderSec(d, nodeId, terim)
+    indeksStr = htAl(d[1], nodeId)
+    eğer metinEsit(indeksStr, "") ise
+        döndür d
+    son
+    indeks = metneTam(indeksStr)
+    nodelarListesi = d[0]
+    kayit = nodelarListesi[indeks]
+    eğer kayit[2] != 1 ise
+        döndür d
+    son
+    mevcutLiderId = d[2][0]
+    eğer metinEsit(mevcutLiderId, "") == 0 ise
+        mevcutLiderIndeksStr = htAl(d[1], mevcutLiderId)
+        eğer metinEsit(mevcutLiderIndeksStr, "") == 0 ise
+            mevcutLiderIndeks = metneTam(mevcutLiderIndeksStr)
+            mevcutLiderKayit = nodelarListesi[mevcutLiderIndeks]
+            mevcutTerim = mevcutLiderKayit[3]
+            eğer terim <= mevcutTerim ise
+                döndür d
+            son
+        son
+    son
+    kayit[3] = terim
+    liderIdKutu = d[2]
+    liderIdKutu[0] = nodeId
+    döndür d
+son
+
+# dagitikLiderKim(d): şu anki lider node'un id'sini döndürür ("" ise
+# lider yok/henüz seçilmedi).
+işlev dagitikLiderKim(d)
+    döndür d[2][0]
+son
+
+# dagitikLiderAktifMi(d): mevcut liderin hâlâ AKTİF (durum=1) olup
+# olmadığını 1/0 döndürür (failover tetikleme kararı için — lider
+# DOWN/SUSPECT ise çağıran yeni bir dagitikLiderSec çağırmalı). Lider
+# hiç seçilmemişse 0 döner.
+işlev dagitikLiderAktifMi(d)
+    liderId = d[2][0]
+    eğer metinEsit(liderId, "") ise
+        döndür 0
+    son
+    eğer dagitikNodeDurumu(d, liderId) == 1 ise
+        döndür 1
+    son
+    döndür 0
+son
