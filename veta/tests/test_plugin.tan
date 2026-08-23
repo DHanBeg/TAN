@@ -1,0 +1,82 @@
+# test_plugin.tan — VETA Plugin Core testleri.
+# Lifecycle: register->validate->load->start->health->stop->unload,
+# gecersiz gecislerin reddedildigi de dahil.
+
+içe al "kutuphane/test.tan"
+içe al "../libraries/plugin/source/plugin.tan"
+
+gecti = 0
+toplam = 0
+
+p = pluginAc()
+p = pluginKaydet(p, "ornek-eklenti", "1.0")
+
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, pluginDurum(p, "ornek-eklenti"), "pluginKaydet: yeni plugin durumu KAYITLI(0)")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, pluginSayisi(p), "pluginKaydet: 1 plugin kayitli")
+
+# GECERSIZ GECIS: kayitli durumdan dogrudan baslat (0->3 atlanamaz)
+p = pluginBaslat(p, "ornek-eklenti")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, pluginDurum(p, "ornek-eklenti"), "pluginBaslat: gecersiz gecis reddedildi, hala KAYITLI(0)")
+
+# dogru sirayla ilerlet
+p = pluginDogrula(p, "ornek-eklenti")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, pluginDurum(p, "ornek-eklenti"), "pluginDogrula: 0->1 DOGRULANMIS")
+
+p = pluginYukle(p, "ornek-eklenti")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(2, pluginDurum(p, "ornek-eklenti"), "pluginYukle: 1->2 YUKLENMIS")
+
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, pluginSaglikKontrol(p, "ornek-eklenti"), "pluginSaglikKontrol: henuz calismiyor, saglik 0")
+
+p = pluginBaslat(p, "ornek-eklenti")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(3, pluginDurum(p, "ornek-eklenti"), "pluginBaslat: 2->3 CALISIYOR")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, pluginSaglikKontrol(p, "ornek-eklenti"), "pluginSaglikKontrol: calisiyor, saglik 1")
+
+# GECERSIZ GECIS: calisiyorken tekrar dogrula (3 durumunda 0->1 gecisi uygulanamaz)
+p = pluginDogrula(p, "ornek-eklenti")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(3, pluginDurum(p, "ornek-eklenti"), "pluginDogrula: calisirken tekrar dogrulama etkisiz, hala CALISIYOR(3)")
+
+p = pluginDurdur(p, "ornek-eklenti")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(4, pluginDurum(p, "ornek-eklenti"), "pluginDurdur: 3->4 DURDURULMUS")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, pluginSaglikKontrol(p, "ornek-eklenti"), "pluginSaglikKontrol: durduruldu, saglik 0")
+
+# restart
+p = pluginYenidenBaslat(p, "ornek-eklenti")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(2, pluginDurum(p, "ornek-eklenti"), "pluginYenidenBaslat: 4->2 YUKLENMIS")
+p = pluginBaslat(p, "ornek-eklenti")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(3, pluginDurum(p, "ornek-eklenti"), "pluginBaslat: yeniden 2->3 CALISIYOR")
+
+p = pluginDurdur(p, "ornek-eklenti")
+p = pluginKaldir(p, "ornek-eklenti")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(5, pluginDurum(p, "ornek-eklenti"), "pluginKaldir: 4->5 KALDIRILMIS")
+
+# GECERSIZ GECIS: kaldirilmis plugin tekrar baslatilamaz
+p = pluginBaslat(p, "ornek-eklenti")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(5, pluginDurum(p, "ornek-eklenti"), "pluginBaslat: kaldirilmis plugin baslatilamiyor, hala KALDIRILMIS(5)")
+
+# olmayan plugin
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0 - 1, pluginDurum(p, "olmayan"), "pluginDurum: olmayan plugin icin -1")
+
+# ikinci plugin bagimsiz calismali
+p = pluginKaydet(p, "ikinci-eklenti", "2.0")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, pluginDurum(p, "ikinci-eklenti"), "pluginKaydet: ikinci plugin bagimsiz olarak KAYITLI(0)")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(2, pluginSayisi(p), "pluginSayisi: toplam 2 plugin")
+
+d = testSonuc(gecti, toplam)

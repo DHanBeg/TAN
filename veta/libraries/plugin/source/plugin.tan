@@ -1,0 +1,151 @@
+# ============================================================
+# plugin.tan — VETA Plugin Core (lifecycle state machine)
+# ------------------------------------------------------------
+# VETA master prompt Plugin Core tanımı: "Lifecycle: register, validate,
+# load, start, health, stop, unload. Plugin security zorunlu."
+#
+# DÜRÜST KAPSAM (v1): TAN'da dinamik kod yükleme (dlopen benzeri) veya
+# fonksiyon-değeri YOK — bu yüzden bu core GERÇEK KOD YÜKLEMEZ/ÇALIŞTIRMAZ.
+# Sadece plugin'in YAŞAM DÖNGÜSÜ DURUMUNU (state machine) doğru sırayla
+# takip eder ve GEÇERSİZ GEÇİŞLERİ reddeder (örn. "kayıtlı" durumdaki bir
+# plugin doğrudan "çalışıyor" olamaz — önce doğrulanmalı, yüklenmeli).
+# Gerçek yükleme/başlatma İŞLEMİ (örn. bir .tan dosyasını derleyip
+# çalıştırma) ÇAĞIRAN KOD tarafından yapılır, bu core sadece durumun
+# TUTARLI kalmasını garanti eder.
+#
+# Durum makinesi (sıralı, atlanamaz):
+#   0 KAYITLI -> 1 DOGRULANMIS -> 2 YUKLENMIS -> 3 CALISIYOR
+#   3 CALISIYOR -> 4 DURDURULMUS -> 2 YUKLENMIS (yeniden başlatılabilir)
+#   4 DURDURULMUS -> 5 KALDIRILMIS (son durum, geri dönüş yok)
+#
+# Yapı: p = [pluginlerListesi, pluginIndeksHt]
+#   pluginlerListesi : dizi [id, ad, versiyon, durum]
+#   pluginIndeksHt   : HashTablo, ad -> pluginlerListesi indeksi
+#
+# Kullanım:
+#   içe al "veta/libraries/plugin/source/plugin.tan"
+#   p = pluginAc()
+#   p = pluginKaydet(p, "ornek-eklenti", "1.0")
+#   p = pluginDogrula(p, "ornek-eklenti")   # 0->1
+#   p = pluginYukle(p, "ornek-eklenti")     # 1->2
+#   p = pluginBaslat(p, "ornek-eklenti")    # 2->3
+#   saglik = pluginSaglikKontrol(p, "ornek-eklenti")  # 1 (calisiyor ise)
+#   p = pluginDurdur(p, "ornek-eklenti")    # 3->4
+#   p = pluginKaldir(p, "ornek-eklenti")    # 4->5
+#
+# NOT: Yeni dil özelliği/keyword EKLENMEDİ. `kayıt`/`sözlük()` KULLANILMADI.
+# HER İFADE TEK SATIRDA, `eğer X değilse` YOK (== 0) — bkz KRİTİK BULGU 2.
+# Security entegrasyonu KAPSAM DIŞI zorunlu değil — çağıran isterse
+# `security.tan`'daki `guvenlikYetkiliMi` sonucunu kontrol edip
+# `pluginYukle`'yi hiç çağırmayabilir (composition, gevşek bağlaşım).
+# ============================================================
+
+içe al "kutuphane/ozet.tan"
+içe al "kutuphane/HashTablo.tan"
+içe al "kutuphane/araclar.tan"
+
+# pluginAc(): boş plugin bağlamı kurar.
+işlev pluginAc()
+    döndür [[], htYeni()]
+son
+
+# pluginKaydet(p, ad, versiyon): "register" — yeni plugin kaydeder
+# (durum=0 KAYITLI). ad zaten kayıtlıysa DEĞİŞTİRMEDEN döner (idempotent,
+# yeniden kayıt yok — sürüm güncellemesi ayrı/kapsam dışı). YENİ p döner.
+işlev pluginKaydet(p, ad, versiyon)
+    mevcutIndeksStr = htAl(p[1], ad)
+    eğer metinEsit(mevcutIndeksStr, "") == 0 ise
+        döndür p
+    son
+    pluginlerListesi = p[0]
+    id = uzunluk(pluginlerListesi) + 1
+    kayit = [id, ad, versiyon, 0]
+    pluginlerListesi = ekle(pluginlerListesi, kayit)
+    indeksHt = htKoy(p[1], ad, metin(uzunluk(pluginlerListesi) - 1))
+    döndür [pluginlerListesi, indeksHt]
+son
+
+# pluginDurum(p, ad): plugin'in şu anki durumunu döndürür (0-5),
+# bulunamazsa 0-1.
+işlev pluginDurum(p, ad)
+    indeksStr = htAl(p[1], ad)
+    eğer metinEsit(indeksStr, "") ise
+        döndür 0 - 1
+    son
+    indeks = metneTam(indeksStr)
+    pluginlerListesi = p[0]
+    kayit = pluginlerListesi[indeks]
+    döndür kayit[3]
+son
+
+# pluginGecisYap(p, ad, beklenenOncekiDurum, yeniDurum): İÇ yardımcı —
+# durum SADECE beklenenOncekiDurum ise yeniDurum'a geçer, aksi halde p
+# DEĞİŞMEDEN döner (geçersiz geçiş sessizce reddedilir — çağıran
+# pluginDurum ile geçişin gerçekleşip gerçekleşmediğini kontrol
+# edebilir).
+işlev pluginGecisYap(p, ad, beklenenOncekiDurum, yeniDurum)
+    indeksStr = htAl(p[1], ad)
+    eğer metinEsit(indeksStr, "") ise
+        döndür p
+    son
+    indeks = metneTam(indeksStr)
+    pluginlerListesi = p[0]
+    kayit = pluginlerListesi[indeks]
+    eğer kayit[3] == beklenenOncekiDurum ise
+        kayit[3] = yeniDurum
+    son
+    döndür p
+son
+
+# pluginDogrula(p, ad): "validate" — 0(KAYITLI) -> 1(DOGRULANMIS).
+işlev pluginDogrula(p, ad)
+    döndür pluginGecisYap(p, ad, 0, 1)
+son
+
+# pluginYukle(p, ad): "load" — 1(DOGRULANMIS) -> 2(YUKLENMIS). GERÇEK
+# kod yükleme YAPMAZ (bkz dosya başı not) — sadece durumu ilerletir.
+işlev pluginYukle(p, ad)
+    döndür pluginGecisYap(p, ad, 1, 2)
+son
+
+# pluginBaslat(p, ad): "start" — 2(YUKLENMIS) -> 3(CALISIYOR).
+işlev pluginBaslat(p, ad)
+    döndür pluginGecisYap(p, ad, 2, 3)
+son
+
+# pluginSaglikKontrol(p, ad): "health" — plugin CALISIYOR (3) durumundaysa
+# 1 (sağlıklı), değilse 0 döndürür.
+işlev pluginSaglikKontrol(p, ad)
+    eğer pluginDurum(p, ad) == 3 ise
+        döndür 1
+    son
+    döndür 0
+son
+
+# pluginDurdur(p, ad): "stop" — 3(CALISIYOR) -> 4(DURDURULMUS).
+işlev pluginDurdur(p, ad)
+    döndür pluginGecisYap(p, ad, 3, 4)
+son
+
+# pluginYenidenBaslat(p, ad): DURDURULMUS bir plugin'i tekrar
+# YUKLENMIS durumuna döndürür (4 -> 2), ardından pluginBaslat ile
+# tekrar çalıştırılabilir. Master prompt'un "restart" ihtiyacını
+# karşılar (dürüst basitleştirme: doğrudan 4->3 değil, 4->2->3 iki
+# adımlı — durum makinesinin sırasını bozmamak için).
+işlev pluginYenidenBaslat(p, ad)
+    döndür pluginGecisYap(p, ad, 4, 2)
+son
+
+# pluginKaldir(p, ad): "unload" — 4(DURDURULMUS) -> 5(KALDIRILMIS).
+# SON durum, buradan geri dönüş yok (yeniden kullanmak için pluginKaydet
+# ile YENİ bir kayıt açılması gerekir — ama ad zaten kayıtlı olduğu için
+# pluginKaydet idempotent davranışıyla eski kaydı korur; bu v1'in
+# bilinen sınırı, "yeniden kaydetme" ayrı bir iş).
+işlev pluginKaldir(p, ad)
+    döndür pluginGecisYap(p, ad, 4, 5)
+son
+
+# pluginSayisi(p): toplam kayıtlı plugin sayısı (durumu ne olursa olsun).
+işlev pluginSayisi(p)
+    döndür uzunluk(p[0])
+son

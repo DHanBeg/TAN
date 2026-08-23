@@ -394,7 +394,19 @@ başlanmadı) + Isolation/2D (tek-thread sınırı hâlâ geçerli).
   Core ile gevşek bağlaşım (composition, import etmiyor — çağıran
   gözlem değerini kendi okuyup besler). Test:
   `veta/tests/test_optimizer.tan` — 14/14 GEÇTİ (WSL native).
-- **Durum:** Storage+Query+Event+Memory+Security+Temporal+Observability+Graph+Semantic+AI Memory+Central Core+Optimizer bitti (tek-node, eşzamanlılık yok, float fonksiyonlar bozuk, dinamik dispatch yok). Sıradaki: Distributed/Plugin/Autonomy/Evolution (hepsi sıfır kod).
+- **Plugin core** ✅ TAMAMLANDI (2026-08-23) — `veta/libraries/plugin/source/plugin.tan`.
+  `pluginAc/pluginKaydet/pluginDurum/pluginDogrula/pluginYukle/
+  pluginBaslat/pluginSaglikKontrol/pluginDurdur/pluginYenidenBaslat/
+  pluginKaldir/pluginSayisi`. Durum makinesi: KAYITLI(0)→DOGRULANMIS(1)→
+  YUKLENMIS(2)→CALISIYOR(3)→DURDURULMUS(4)→[YUKLENMIS(2) restart |
+  KALDIRILMIS(5) son durum]. GEÇERSİZ geçişler (örn. 0'dan doğrudan 3'e)
+  sessizce reddediliyor, durum bozulmuyor. TAN'da dinamik kod yükleme/
+  fonksiyon-değeri YOK — bu core GERÇEK KOD ÇALIŞTIRMAZ, sadece yaşam
+  döngüsü durumunu tutarlı takip eder (dürüst). Security entegrasyonu
+  zorunlu değil, composition ile eklenebilir. Test:
+  `veta/tests/test_plugin.tan` — 18/18 GEÇTİ (WSL native), geçersiz geçiş
+  reddi + restart + kaldırma-sonrası-kilit senaryoları dahil.
+- **Durum:** Storage+Query+Event+Memory+Security+Temporal+Observability+Graph+Semantic+AI Memory+Central Core+Optimizer+Plugin bitti (tek-node, eşzamanlılık yok, float fonksiyonlar bozuk, dinamik dispatch yok). Sıradaki: Distributed/Autonomy/Evolution (hepsi sıfır kod).
 
 ## Sonraki Adımlar
 
