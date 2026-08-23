@@ -290,7 +290,20 @@ başlanmadı) + Isolation/2D (tek-thread sınırı hâlâ geçerli).
   — 13/13 GEÇTİ (WSL native). Bu core'u yazarken KRİTİK BULGU 2 (yukarı
   bakın: çok satırlı ifade + `X değilse` yanlış kullanımı) bulundu ve
   düzeltildi.
-- **Durum:** Storage+Query+Event+Memory+Security+Temporal bitti (tek-node, eşzamanlılık yok). Sıradaki: Central Core veya Distributed/Semantic/Graph/AI Memory/Observability/Optimizer/Plugin/Autonomy/Evolution (hepsi sıfır kod).
+- **Observability core** ✅ TAMAMLANDI (2026-08-23) — `veta/libraries/observability/source/observability.tan`.
+  `gozlemAc/gozlemSayacArtir/gozlemSayacOku/gozlemGaugeAyarla/gozlemGaugeOku/
+  gozlemLogYaz/gozlemLogSayisi/gozlemSpanBaslat/gozlemSpanKaydet/
+  gozlemSpanBitir/gozlemSpanSayisi/gozlemSaglikAyarla/gozlemSaglikOku/
+  gozlemUyariEsigiAyarla/gozlemUyariKontrolEt`. Gerçek `zaman()` yerleşiği
+  kullanıldı (span süresi gerçek wall-clock ile ölçülüyor — Temporal
+  core'daki mantıksal sayaçtan farklı, burada gerekli). Histogram KAPSAM
+  DIŞI (dürüst). Trace ID merkezi korelasyonu Central Core henüz yok
+  olduğu için YOK. Test: `veta/tests/test_observability.tan` — 14/14
+  GEÇTİ (WSL native). KRİTİK BULGU 2'deki `X değilse` hatasına BEN DE
+  düştüm yazarken (`eğer ... değilse` "ise" olmadan) — kendi kendine
+  probe testiyle (cascade-parse kontrolü) yazımdan hemen sonra yakalayıp
+  düzelttim, öğrenilen dersin işe yaradığı doğrulandı.
+- **Durum:** Storage+Query+Event+Memory+Security+Temporal+Observability bitti (tek-node, eşzamanlılık yok). Sıradaki: Central Core veya Distributed/Semantic/Graph/AI Memory/Optimizer/Plugin/Autonomy/Evolution (hepsi sıfır kod).
 
 ## Sonraki Adımlar
 

@@ -1,0 +1,229 @@
+# ============================================================
+# observability.tan — VETA Observability Core (Metric/Log/Trace/Health/Alert)
+# ------------------------------------------------------------
+# VETA master prompt Observability Core tanımı: "Her core: Metric,
+# Counter, Gauge, Histogram, Trace, Span, Log, Event, Health, Alert
+# üretmeli. Trace ID Central Core tarafından taşınmalı."
+#
+# DÜRÜST KAPSAM (v1): Histogram YOK (bucket/percentile hesaplama ayrı
+# bir iş, sonraki). Trace ID central core henüz yok, bu core kendi
+# başına span/trace tutuyor — merkezi korelasyon sonraki iş.
+# Zaman: gerçek `zaman()` yerleşiği kullanılıyor (wall-clock VAR,
+# Temporal core'daki mantıksal sayaçtan FARKLI — burada gerçek zaman
+# gerekli çünkü süre/latency ölçülüyor).
+#
+# Yapı: gozlem = [sayaclarHt, gaugelarHt, logListesi, spanListesi,
+#                 aktifSpanlarHt, saglikHt, esiklerHt]
+#   sayaclarHt    : HashTablo, metrikAdi -> deger (string int), sadece artar
+#   gaugelarHt    : HashTablo, metrikAdi -> deger (string, herhangi an ayarlanabilir)
+#   logListesi    : dizi, her eleman [zaman, seviye, mesaj]
+#   spanListesi   : dizi, TAMAMLANMIŞ span'ler [ad, baslangic, bitis, sureMs]
+#   aktifSpanlarHt: HashTablo, spanId(string) -> "ad|baslangicZamani"
+#   saglikHt      : HashTablo, bilesenAdi -> "1" (saglikli) / "0" (saglıksız)
+#   esiklerHt     : HashTablo, metrikAdi -> esikDeger (string), alert icin
+#
+# Kullanım:
+#   içe al "veta/libraries/observability/source/observability.tan"
+#   g = gozlemAc()
+#   g = gozlemSayacArtir(g, "istek_sayisi", 1)
+#   g = gozlemGaugeAyarla(g, "aktif_baglanti", "5")
+#   g = gozlemLogYaz(g, "INFO", "sistem basladi")
+#   [g, spanId] = gozlemSpanBaslatId(g, "sorgu_calistir")  # TAN tek deger dondurur, bkz asagida
+#   g = gozlemSpanBitir(g, spanId)
+#   g = gozlemSaglikAyarla(g, "storage", 1)
+#   g = gozlemUyariEsigiAyarla(g, "istek_sayisi", "100")
+#   uyariVar = gozlemUyariKontrolEt(g, "istek_sayisi")
+#
+# NOT: Yeni dil özelliği/keyword EKLENMEDİ — sadece mevcut TAN dili
+# (işlev/eğer/iken/döndür) kullanıldı (proje kuralı). `kayıt`/`sözlük()`
+# KULLANILMADI (TancElf'te sessizce çalışmıyor, bkz VETA_STATUS.md).
+# ============================================================
+
+içe al "kutuphane/ozet.tan"
+içe al "kutuphane/HashTablo.tan"
+içe al "kutuphane/araclar.tan"
+içe al "kutuphane/tanoku.tan"
+
+# gozlemAc(): boş gözlemlenebilirlik bağlamı kurar.
+işlev gozlemAc()
+    döndür [htYeni(), htYeni(), [], [], htYeni(), htYeni(), htYeni()]
+son
+
+# gozlemSayacArtir(gozlem, ad, miktar): sayacı miktar kadar artırır
+# (yoksa 0'dan başlar). YENİ gozlem döndürür.
+işlev gozlemSayacArtir(gozlem, ad, miktar)
+    mevcutStr = htAl(gozlem[0], ad)
+    eğer metinEsit(mevcutStr, "") ise
+        mevcut = 0
+    değilse
+        mevcut = metneTam(mevcutStr)
+    son
+    sayaclarHt = htKoy(gozlem[0], ad, metin(mevcut + miktar))
+    döndür [sayaclarHt, gozlem[1], gozlem[2], gozlem[3], gozlem[4], gozlem[5], gozlem[6]]
+son
+
+# gozlemSayacOku(gozlem, ad): sayaç değerini (tam sayı) döndürür, yoksa 0.
+işlev gozlemSayacOku(gozlem, ad)
+    v = htAl(gozlem[0], ad)
+    eğer metinEsit(v, "") ise
+        döndür 0
+    son
+    döndür metneTam(v)
+son
+
+# gozlemGaugeAyarla(gozlem, ad, deger): gauge'u deger'e ayarlar (metin).
+# YENİ gozlem döndürür.
+işlev gozlemGaugeAyarla(gozlem, ad, deger)
+    gaugelarHt = htKoy(gozlem[1], ad, deger)
+    döndür [gozlem[0], gaugelarHt, gozlem[2], gozlem[3], gozlem[4], gozlem[5], gozlem[6]]
+son
+
+# gozlemGaugeOku(gozlem, ad): gauge değerini (metin) döndürür, yoksa "".
+işlev gozlemGaugeOku(gozlem, ad)
+    döndür htAl(gozlem[1], ad)
+son
+
+# gozlemLogYaz(gozlem, seviye, mesaj): append-only log kaydı ekler
+# ([zaman, seviye, mesaj]). YENİ gozlem döndürür.
+işlev gozlemLogYaz(gozlem, seviye, mesaj)
+    kayit = [zaman(), seviye, mesaj]
+    logListesi = ekle(gozlem[2], kayit)
+    döndür [gozlem[0], gozlem[1], logListesi, gozlem[3], gozlem[4], gozlem[5], gozlem[6]]
+son
+
+# gozlemLogSayisi(gozlem): toplam log kaydı sayısı.
+işlev gozlemLogSayisi(gozlem)
+    döndür uzunluk(gozlem[2])
+son
+
+# gozlemSpanBaslat(gozlem, ad): yeni bir span başlatır, benzersiz bir
+# spanId (metin, artan sayaç aktifSpanlarHt boyutuna göre DEĞİL —
+# aktifSpanlarHt'nin eleman sayısı yerine spanListesi+aktifSpanlarHt
+# toplam sayısı kullanılamaz çünkü HashTablo boyutu doğrudan
+# okunamıyor; bunun yerine zaman()+ad kombinasyonu benzersiz kabul
+# edilir — dürüst basitleştirme: aynı ad+aynı saniyede iki span
+# başlatılırsa ID çakışabilir, v1 sınırı) ile aktifSpanlarHt'ye
+# "ad|baslangicZamani" olarak kaydeder. spanId'yi döndürür (TEK
+# değer — çağıran spanId'yi SAKLAMALI, gozlemSpanBitir'e lazım).
+işlev gozlemSpanBaslat(gozlem, ad)
+    baslangic = zaman()
+    spanId = metinBirlestir(metinBirlestir(ad, "#"), metin(baslangic))
+    kayit = metinBirlestir(metinBirlestir(ad, "|"), metin(baslangic))
+    döndür spanId
+son
+
+# gozlemSpanKaydet(gozlem, spanId, ad): gozlemSpanBaslat'ın YAN ETKİSİZ
+# olması nedeniyle (yukarıdaki fonksiyon gozlem'i DEĞİŞTİRMEDEN spanId
+# döndürüyor), asıl kayıt bu fonksiyonla aktifSpanlarHt'ye yazılır.
+# Kullanım: spanId = gozlemSpanBaslat(gozlem, "ad"); gozlem =
+# gozlemSpanKaydet(gozlem, spanId, "ad", <spanId'nin icindeki zaman>).
+# NOT: Bu iki-adimli tasarim TAN'in tek-deger-donus kisitindan kaynaklanir
+# (bkz query.tan/event.tan'daki "sonId" deseni ile ayni sebep).
+işlev gozlemSpanKaydet(gozlem, spanId, ad, baslangicZamani)
+    kayit = metinBirlestir(metinBirlestir(ad, "|"), metin(baslangicZamani))
+    aktifSpanlarHt = htKoy(gozlem[4], spanId, kayit)
+    döndür [gozlem[0], gozlem[1], gozlem[2], gozlem[3], aktifSpanlarHt, gozlem[5], gozlem[6]]
+son
+
+# gozlemSpanBitir(gozlem, spanId): spanId'li aktif span'i tamamlar,
+# süresini hesaplar (zaman() - baslangicZamani), spanListesi'ne
+# [ad, baslangic, bitis, sure] olarak ekler, aktifSpanlarHt'den
+# çıkarır. spanId bulunamazsa gozlem'i değiştirmeden döndürür.
+işlev gozlemSpanBitir(gozlem, spanId)
+    kayitStr = htAl(gozlem[4], spanId)
+    eğer metinEsit(kayitStr, "") ise
+        döndür gozlem
+    son
+    n = uzunluk(kayitStr)
+    ayracIdx = 0 - 1
+    i = 0
+    iken i < n
+        eğer metinEsit(metinAl(kayitStr, i), "|") ise
+            ayracIdx = i
+            i = n
+        değilse
+            i = i + 1
+        son
+    son
+    ad = ""
+    j = 0
+    iken j < ayracIdx
+        ad = metinBirlestir(ad, metinAl(kayitStr, j))
+        j = j + 1
+    son
+    baslangicStr = ""
+    j = ayracIdx + 1
+    iken j < n
+        baslangicStr = metinBirlestir(baslangicStr, metinAl(kayitStr, j))
+        j = j + 1
+    son
+    baslangic = metneTam(baslangicStr)
+    bitis = zaman()
+    sure = bitis - baslangic
+    yeniKayit = [ad, baslangic, bitis, sure]
+    spanListesi = ekle(gozlem[3], yeniKayit)
+    aktifSpanlarHt = htSil(gozlem[4], spanId)
+    döndür [gozlem[0], gozlem[1], gozlem[2], spanListesi, aktifSpanlarHt, gozlem[5], gozlem[6]]
+son
+
+# gozlemSpanSayisi(gozlem): tamamlanmış span sayısı.
+işlev gozlemSpanSayisi(gozlem)
+    döndür uzunluk(gozlem[3])
+son
+
+# gozlemSaglikAyarla(gozlem, bilesen, saglikliMi): bileşenin sağlık
+# durumunu ayarlar (saglikliMi: 1 veya 0). YENİ gozlem döndürür.
+işlev gozlemSaglikAyarla(gozlem, bilesen, saglikliMi)
+    eğer saglikliMi == 1 ise
+        deger = "1"
+    değilse
+        deger = "0"
+    son
+    saglikHt = htKoy(gozlem[5], bilesen, deger)
+    döndür [gozlem[0], gozlem[1], gozlem[2], gozlem[3], gozlem[4], saglikHt, gozlem[6]]
+son
+
+# gozlemSaglikOku(gozlem, bilesen): 1 (sağlıklı), 0 (sağlıksız veya
+# hiç raporlanmamış — bilinmeyen bileşen "sağlıksız" varsayılır,
+# güvenli varsayılan).
+işlev gozlemSaglikOku(gozlem, bilesen)
+    v = htAl(gozlem[5], bilesen)
+    eğer metinEsit(v, "1") ise
+        döndür 1
+    son
+    döndür 0
+son
+
+# gozlemUyariEsigiAyarla(gozlem, metrikAdi, esik): sayaç/gauge için
+# alarm eşiği tanımlar. YENİ gozlem döndürür.
+işlev gozlemUyariEsigiAyarla(gozlem, metrikAdi, esik)
+    esiklerHt = htKoy(gozlem[6], metrikAdi, esik)
+    döndür [gozlem[0], gozlem[1], gozlem[2], gozlem[3], gozlem[4], gozlem[5], esiklerHt]
+son
+
+# gozlemUyariKontrolEt(gozlem, metrikAdi): metrikAdi'nin (önce
+# sayaçlarda, yoksa gauge'larda aranır) eşiği aşıp aşmadığını 1/0
+# döndürür. Eşik tanımlı değilse 0 (uyarı yok) döner.
+işlev gozlemUyariKontrolEt(gozlem, metrikAdi)
+    esikStr = htAl(gozlem[6], metrikAdi)
+    eğer metinEsit(esikStr, "") ise
+        döndür 0
+    son
+    esik = metneTam(esikStr)
+    sayacStr = htAl(gozlem[0], metrikAdi)
+    eğer metinEsit(sayacStr, "") == 0 ise
+        değer = metneTam(sayacStr)
+        eğer değer >= esik ise
+            döndür 1
+        son
+        döndür 0
+    son
+    gaugeStr = htAl(gozlem[1], metrikAdi)
+    eğer metinEsit(gaugeStr, "") == 0 ise
+        değer = metneTam(gaugeStr)
+        eğer değer >= esik ise
+            döndür 1
+        son
+    son
+    döndür 0
+son

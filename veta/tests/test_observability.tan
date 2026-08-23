@@ -1,0 +1,69 @@
+# test_observability.tan — VETA Observability Core testleri.
+# Counter/Gauge/Log/Span/Health/Alert.
+
+içe al "kutuphane/test.tan"
+içe al "../libraries/observability/source/observability.tan"
+
+gecti = 0
+toplam = 0
+
+g = gozlemAc()
+
+# counter
+g = gozlemSayacArtir(g, "istek", 1)
+g = gozlemSayacArtir(g, "istek", 1)
+g = gozlemSayacArtir(g, "istek", 3)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(5, gozlemSayacOku(g, "istek"), "gozlemSayacArtir: birikimli artiyor")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, gozlemSayacOku(g, "olmayan"), "gozlemSayacOku: olmayan sayac 0 donuyor")
+
+# gauge
+g = gozlemGaugeAyarla(g, "baglanti", "7")
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("7", gozlemGaugeOku(g, "baglanti"), "gozlemGaugeAyarla/Oku: deger dogru")
+g = gozlemGaugeAyarla(g, "baglanti", "3")
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("3", gozlemGaugeOku(g, "baglanti"), "gozlemGaugeAyarla: uzerine yazinca guncelleniyor")
+
+# log
+g = gozlemLogYaz(g, "INFO", "sistem basladi")
+g = gozlemLogYaz(g, "ERROR", "bir hata oldu")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(2, gozlemLogSayisi(g), "gozlemLogYaz: 2 kayit eklendi")
+
+# span
+spanId = gozlemSpanBaslat(g, "sorgu")
+g = gozlemSpanKaydet(g, spanId, "sorgu", zaman())
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, gozlemSpanSayisi(g), "gozlemSpanBaslat: henuz tamamlanmadi, sayim 0")
+g = gozlemSpanBitir(g, spanId)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, gozlemSpanSayisi(g), "gozlemSpanBitir: tamamlanan span sayiliyor")
+
+# olmayan spanId ile bitirme - guvenli, gozlem degismemeli
+g = gozlemSpanBitir(g, "olmayan-span-id")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, gozlemSpanSayisi(g), "gozlemSpanBitir: olmayan spanId sessizce yok sayiliyor")
+
+# health
+g = gozlemSaglikAyarla(g, "storage", 1)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, gozlemSaglikOku(g, "storage"), "gozlemSaglikAyarla: saglikli olarak okunuyor")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, gozlemSaglikOku(g, "bilinmeyen-bilesen"), "gozlemSaglikOku: raporlanmamis bilesen guvenli varsayilan (0)")
+g = gozlemSaglikAyarla(g, "storage", 0)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, gozlemSaglikOku(g, "storage"), "gozlemSaglikAyarla: saglıksiz olarak guncelleniyor")
+
+# alert
+g = gozlemUyariEsigiAyarla(g, "istek", "5")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, gozlemUyariKontrolEt(g, "istek"), "gozlemUyariKontrolEt: esige ulasan sayac tetikliyor")
+g = gozlemUyariEsigiAyarla(g, "baglanti", "100")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, gozlemUyariKontrolEt(g, "baglanti"), "gozlemUyariKontrolEt: esigin altindaki gauge tetiklemiyor")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, gozlemUyariKontrolEt(g, "esigi-olmayan-metrik"), "gozlemUyariKontrolEt: esik tanimsizsa uyari yok")
+
+d = testSonuc(gecti, toplam)
