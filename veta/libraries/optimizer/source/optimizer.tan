@@ -1,0 +1,174 @@
+# ============================================================
+# optimizer.tan — VETA Optimizer Core (deterministic öneri/politika/uygulama)
+# ------------------------------------------------------------
+# VETA master prompt Optimizer Core tanımı: "Önce deterministic. Sonra
+# adaptive. Sonra AI-assisted. Kararlar: query plan, index, cache,
+# storage placement, compression, execution placement. Pipeline:
+# OBSERVE -> ANALYZE -> PROPOSE -> SIMULATE -> POLICY -> APPLY -> VERIFY
+# -> ROLLBACK/PROMOTE."
+#
+# DÜRÜST KAPSAM (v1): SADECE deterministic seviye. "Adaptive" (geçmiş
+# performansa göre kendi kendine ayarlanma) ve "AI-assisted" KAPSAM
+# DIŞI — ikisi de gerçek istatistik/skorlama gerektirir ve TAN'da
+# kullanıcı işlevlerinde FLOAT bozuk (KRİTİK BULGU 3), bu yüzden
+# olasılıksal/skorlu bir optimizer güvenilir yazılamaz. SIMULATE aşaması
+# da KAPSAM DIŞI (gerçek "sanal ortamda çalıştırıp sonucu ölçme" — TAN'da
+# izolasyon/snapshot mekanizması yok, ayrı iş). Bu v1: kural-tabanlı
+# ÖNERİ ÜRETİMİ + POLİTİKA KONTROLÜ + UYGULAMA/GERİ ALMA DURUMU takibi.
+#
+# Composition: Observability Core (`gozlemSayacOku`/`gozlemGaugeOku`)
+# ile BİRLİKTE kullanılabilir (bu core onu import etmiyor — çağıran
+# gözlem değerini okuyup `optimizeEsikKontrolEt`'e kendisi verir,
+# gevşek bağlaşım/loose coupling).
+#
+# Yapı: opt = [onerilerListesi, onerilerIndeksHt]
+#   onerilerListesi : dizi [id, tur, hedef, sebep, durum]
+#     (durum: 0=onerildi, 1=uygulandi, 2=geri_alindi/reddedildi)
+#   onerilerIndeksHt: HashTablo, id(metin) -> onerilerListesi indeksi
+#
+# Kullanım:
+#   içe al "veta/libraries/optimizer/source/optimizer.tan"
+#   opt = optimizeAc()
+#   # OBSERVE+ANALYZE (basit esik kontrolu, cagiran gozlem degerini kendi okur):
+#   analizGerekli = optimizeEsikKontrolEt(1200, 1000)   # deger, esik -> 1/0
+#   # PROPOSE:
+#   opt = optimizeOner(opt, "cache_tasi", "sicak_anahtar_X", "erisim esigi asildi")
+#   oneriId = optimizeSonOneriId(opt)
+#   # POLICY:
+#   izinli = optimizePolitikaKontrolEt(opt, oneriId, ["cache_tasi", "index_olustur"])
+#   # APPLY (izinliyse):
+#   opt = optimizeUygula(opt, oneriId)
+#   # VERIFY basarisizsa ROLLBACK:
+#   opt = optimizeGeriAl(opt, oneriId)
+#
+# NOT: Yeni dil özelliği/keyword EKLENMEDİ. `kayıt`/`sözlük()` KULLANILMADI.
+# HER İFADE TEK SATIRDA, `eğer X değilse` YOK (== 0) — bkz KRİTİK BULGU 2.
+# Float YOK (bkz KRİTİK BULGU 3) — tüm eşikler/skorlar TAM SAYI.
+# ============================================================
+
+içe al "kutuphane/ozet.tan"
+içe al "kutuphane/HashTablo.tan"
+içe al "kutuphane/araclar.tan"
+
+# dizideIndeksi(dizi, aranan): lineer arama (diğer core'larla aynı
+# yerel-kopya desen).
+işlev dizideIndeksi(dizi, aranan)
+    i = 0
+    n = uzunluk(dizi)
+    iken i < n
+        mevcut = metinBirlestir("", dizi[i])
+        eğer metinEsit(mevcut, aranan) ise
+            döndür i
+        son
+        i = i + 1
+    son
+    döndür 0 - 1
+son
+
+# optimizeAc(): boş optimizer bağlamı kurar.
+işlev optimizeAc()
+    döndür [[], htYeni()]
+son
+
+# optimizeEsikKontrolEt(deger, esik): "OBSERVE + ANALYZE" — bir metrik
+# değerinin eşiği aşıp aşmadığını (>=, tam sayı) 1/0 döndürür. Bağımsız
+# bir yardımcı fonksiyon (opt bağlamına ihtiyaç duymaz) — çağıran
+# Observability Core'dan okuduğu değeri buraya besler (composition).
+işlev optimizeEsikKontrolEt(deger, esik)
+    eğer deger >= esik ise
+        döndür 1
+    son
+    döndür 0
+son
+
+# optimizeOner(opt, tur, hedef, sebep): "PROPOSE" — yeni bir optimizasyon
+# önerisi oluşturur (id=sayaç, durum=0 önerildi). YENİ opt döndürür.
+işlev optimizeOner(opt, tur, hedef, sebep)
+    onerilerListesi = opt[0]
+    id = uzunluk(onerilerListesi) + 1
+    kayit = [id, tur, hedef, sebep, 0]
+    onerilerListesi = ekle(onerilerListesi, kayit)
+    onerilerIndeksHt = htKoy(opt[1], metin(id), metin(uzunluk(onerilerListesi) - 1))
+    döndür [onerilerListesi, onerilerIndeksHt]
+son
+
+# optimizeSonOneriId(opt): en son oluşturulan önerinin id'sini döndürür.
+işlev optimizeSonOneriId(opt)
+    onerilerListesi = opt[0]
+    n = uzunluk(onerilerListesi)
+    eğer n == 0 ise
+        döndür 0 - 1
+    son
+    sonKayit = onerilerListesi[n - 1]
+    döndür sonKayit[0]
+son
+
+# optimizePolitikaKontrolEt(opt, oneriId, izinliTurlerListesi): "POLICY
+# ENFORCEMENT" — önerinin türü izinliTurlerListesi'nde varsa 1
+# (uygulanabilir), yoksa 0 (politika reddediyor) döner. oneriId
+# bulunamazsa 0 döner (güvenli varsayılan — bilinmeyen öneri reddedilir).
+işlev optimizePolitikaKontrolEt(opt, oneriId, izinliTurlerListesi)
+    indeksStr = htAl(opt[1], metin(oneriId))
+    eğer metinEsit(indeksStr, "") ise
+        döndür 0
+    son
+    indeks = metneTam(indeksStr)
+    onerilerListesi = opt[0]
+    kayit = onerilerListesi[indeks]
+    tur = kayit[1]
+    eğer dizideIndeksi(izinliTurlerListesi, tur) >= 0 ise
+        döndür 1
+    son
+    döndür 0
+son
+
+# optimizeUygula(opt, oneriId): "APPLY" — önerinin durumunu 1
+# (uygulandı) yapar. GERÇEK yan etkiyi (örn. cache'e taşıma) bu
+# fonksiyon YAPMAZ — sadece durumu işaretler, gerçek işlemi ÇAĞIRAN
+# yapıp SONRA bu fonksiyonu çağırır (Central Core'daki routing kararı
+# ile aynı felsefe: karar burada, icra çağıranda). oneriId bulunamazsa
+# opt'u değiştirmeden döndürür.
+işlev optimizeUygula(opt, oneriId)
+    indeksStr = htAl(opt[1], metin(oneriId))
+    eğer metinEsit(indeksStr, "") ise
+        döndür opt
+    son
+    indeks = metneTam(indeksStr)
+    onerilerListesi = opt[0]
+    kayit = onerilerListesi[indeks]
+    kayit[4] = 1
+    döndür opt
+son
+
+# optimizeGeriAl(opt, oneriId): "ROLLBACK" — önerinin durumunu 2
+# (geri alındı/reddedildi) yapar. oneriId bulunamazsa opt'u değiştirmeden
+# döndürür.
+işlev optimizeGeriAl(opt, oneriId)
+    indeksStr = htAl(opt[1], metin(oneriId))
+    eğer metinEsit(indeksStr, "") ise
+        döndür opt
+    son
+    indeks = metneTam(indeksStr)
+    onerilerListesi = opt[0]
+    kayit = onerilerListesi[indeks]
+    kayit[4] = 2
+    döndür opt
+son
+
+# optimizeOneriDurum(opt, oneriId): önerinin durumunu döndürür
+# (0=önerildi, 1=uygulandı, 2=geri_alındı). Bulunamazsa 0-1 döner.
+işlev optimizeOneriDurum(opt, oneriId)
+    indeksStr = htAl(opt[1], metin(oneriId))
+    eğer metinEsit(indeksStr, "") ise
+        döndür 0 - 1
+    son
+    indeks = metneTam(indeksStr)
+    onerilerListesi = opt[0]
+    kayit = onerilerListesi[indeks]
+    döndür kayit[4]
+son
+
+# optimizeOneriSayisi(opt): toplam öneri sayısı (durumu ne olursa olsun).
+işlev optimizeOneriSayisi(opt)
+    döndür uzunluk(opt[0])
+son

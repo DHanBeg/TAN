@@ -1,0 +1,69 @@
+# test_optimizer.tan — VETA Optimizer Core testleri.
+# Deterministic pipeline: observe/analyze -> propose -> policy -> apply/rollback.
+
+içe al "kutuphane/test.tan"
+içe al "../libraries/optimizer/source/optimizer.tan"
+
+gecti = 0
+toplam = 0
+
+# OBSERVE + ANALYZE
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, optimizeEsikKontrolEt(1200, 1000), "optimizeEsikKontrolEt: esigi asan deger 1 donuyor")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, optimizeEsikKontrolEt(500, 1000), "optimizeEsikKontrolEt: esigin altindaki deger 0 donuyor")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, optimizeEsikKontrolEt(1000, 1000), "optimizeEsikKontrolEt: esige esit deger de tetikliyor (>=)")
+
+opt = optimizeAc()
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, optimizeOneriSayisi(opt), "optimizeAc: bos baglamda 0 oneri")
+
+# PROPOSE
+opt = optimizeOner(opt, "cache_tasi", "sicak_anahtar_X", "erisim esigi asildi")
+oneriId1 = optimizeSonOneriId(opt)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, oneriId1, "optimizeOner: ilk oneri id=1")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, optimizeOneriDurum(opt, oneriId1), "optimizeOner: yeni oneri durumu Onerildi(0)")
+
+# POLICY
+izinliTurler = ["cache_tasi", "index_olustur"]
+politikaSonucu = optimizePolitikaKontrolEt(opt, oneriId1, izinliTurler)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, politikaSonucu, "optimizePolitikaKontrolEt: izinli tur kabul ediliyor")
+
+opt = optimizeOner(opt, "riskli_islem", "hedefY", "test")
+oneriId2 = optimizeSonOneriId(opt)
+politikaSonucu2 = optimizePolitikaKontrolEt(opt, oneriId2, izinliTurler)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, politikaSonucu2, "optimizePolitikaKontrolEt: izinli olmayan tur reddediliyor")
+
+# olmayan oneriId ile politika kontrolu - guvenli varsayilan (reddedilir)
+politikaSonucu3 = optimizePolitikaKontrolEt(opt, 999, izinliTurler)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, politikaSonucu3, "optimizePolitikaKontrolEt: olmayan oneri guvenli sekilde reddediliyor")
+
+# APPLY
+opt = optimizeUygula(opt, oneriId1)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, optimizeOneriDurum(opt, oneriId1), "optimizeUygula: durum Uygulandi(1) oldu")
+
+# ROLLBACK
+opt = optimizeGeriAl(opt, oneriId2)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(2, optimizeOneriDurum(opt, oneriId2), "optimizeGeriAl: durum GeriAlindi(2) oldu")
+
+# uygulanan oneri digerini etkilemedi
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, optimizeOneriDurum(opt, oneriId1), "optimizeGeriAl: baska oneri etkilenmedi (hala Uygulandi)")
+
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(2, optimizeOneriSayisi(opt), "optimizeOneriSayisi: toplam 2 oneri")
+
+# olmayan oneriId ile uygula/geri al - guvenli, sessizce yok sayilir
+opt = optimizeUygula(opt, 999)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(2, optimizeOneriSayisi(opt), "optimizeUygula: olmayan oneriId sessizce yok sayiliyor")
+
+d = testSonuc(gecti, toplam)

@@ -383,7 +383,18 @@ başlanmadı) + Isolation/2D (tek-thread sınırı hâlâ geçerli).
   native), retry sayacının FONKSİYON İÇİNDE `merkez[4]=X` ile YERİNDE
   mutasyonu (return edilmeden) çağıranın değişkenine yansıdığı da dahil
   doğrulandı (dizi referans semantiği bu derinlikte de tutarlı).
-- **Durum:** Storage+Query+Event+Memory+Security+Temporal+Observability+Graph+Semantic+AI Memory+Central Core bitti (tek-node, eşzamanlılık yok, float fonksiyonlar bozuk, dinamik dispatch yok). Sıradaki: Distributed/Optimizer/Plugin/Autonomy/Evolution (hepsi sıfır kod).
+- **Optimizer core** ✅ TAMAMLANDI (2026-08-23) — `veta/libraries/optimizer/source/optimizer.tan`.
+  `optimizeAc/optimizeEsikKontrolEt/optimizeOner/optimizeSonOneriId/
+  optimizePolitikaKontrolEt/optimizeUygula/optimizeGeriAl/
+  optimizeOneriDurum/optimizeOneriSayisi`. SADECE deterministic seviye
+  (eşik-tabanlı öneri + politika kontrolü + apply/rollback durum
+  takibi). Adaptive ve AI-assisted seviyeler KAPSAM DIŞI (float bozuk,
+  KRİTİK BULGU 3, skorlu/istatistiksel optimizer güvenilir yazılamaz).
+  SIMULATE aşaması KAPSAM DIŞI (TAN'da izolasyon yok). Observability
+  Core ile gevşek bağlaşım (composition, import etmiyor — çağıran
+  gözlem değerini kendi okuyup besler). Test:
+  `veta/tests/test_optimizer.tan` — 14/14 GEÇTİ (WSL native).
+- **Durum:** Storage+Query+Event+Memory+Security+Temporal+Observability+Graph+Semantic+AI Memory+Central Core+Optimizer bitti (tek-node, eşzamanlılık yok, float fonksiyonlar bozuk, dinamik dispatch yok). Sıradaki: Distributed/Plugin/Autonomy/Evolution (hepsi sıfır kod).
 
 ## Sonraki Adımlar
 
