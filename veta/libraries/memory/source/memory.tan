@@ -1,0 +1,186 @@
+# ============================================================
+# memory.tan — VETA Memory Core (Faz: hot/warm/cold/cache/eviction)
+# ------------------------------------------------------------
+# VETA master prompt'taki Memory Core tanımı: "hot/warm/cold/
+# cache/eviction/pressure/compression/tier migration yönetir.
+# Central Core policy verir, Memory Core gerçek operasyonu yapar."
+#
+# DÜRÜST KAPSAM (v1): Bu dosya SADECE LFU (least-frequently-used)
+# tabanlı tahliye + basit key-value cache yapıyor.
+# Compression / NUMA / tier migration / gerçek OS bellek baskısı
+# KAPSAM DIŞI — TAN'da o API yok, bu v1'de dürüstçe yok.
+#
+# Yapı: bellek = [ht, erisimSayaci, anahtarSirasi, kapasiteKutu]
+#   ht            : HashTablo, anahtar -> değer (string)
+#   erisimSayaci  : AYRI HashTablo, anahtar -> erişim sayısı
+#                   (STRING olarak tutulur; metin()/metneTam()
+#                   ile çevrilir — sözlük tipi kullanılamaz,
+#                   doğrulandı: kayıt/sözlük TancElf'te sessizce
+#                   çalışmıyor, VETA_STATUS.md'de kayıtlı bug)
+#   anahtarSirasi : dizi, eklenme sırasıyla TÜM anahtarlar
+#                   (LFU taraması için; silinen anahtar buradan
+#                   da ÇIKARILIR)
+#   kapasiteKutu  : [n] mutable kutu, max eleman sayısı
+#
+# Bilinen basitleştirme (dürüst): bellekAl OKUMA sayacını
+# ARTIRMİYOR — sadece bellekKoy'daki tekrar-yazma sayacı
+# artıyor. Gerçek LFU okuma sayısını da saymalı ama fonksiyon
+# imza kısıtından dolayı (tek değer dönüşü) bu v1'de YOK.
+#
+# Desen kaynakları (kanıtlanmış kod, yeni dil özelliği YOK):
+#   - HashTablo.tan: htYeni/htKoy/htAl/htVarMi/htSil + immutable
+#     "YENİ tablo döndür" deseni + metinBirlestir("", x) sarmalama
+#     notu (dizi elemanı metin yaz()/karşılaştırma öncesi bağlama alınır)
+#   - event.tan: dizideIndeksi lineer arama + eventAboneKaldir'ın
+#     "idx dışındakiler yeni diziye kopyalanır" çıkarma deseni
+#   - query.tan: aynı içe al seti (ozet + HashTablo + araclar)
+#     ve kutu kalıbı
+#
+# Kullanım:
+#   içe al "veta/libraries/memory/source/memory.tan"
+#   bellek = bellekAc(100)
+#   bellek = bellekKoy(bellek, "a", "1")     # YENİ bellek döner
+#   deger = bellekAl(bellek, "a")            # "1"
+#   varMi = bellekIcindeMi(bellek, "a")      # 1
+#   n = bellekBoyut(bellek)                  # eleman sayısı
+#   bellek = bellekSil(bellek, "a")
+# ============================================================
+
+içe al "kutuphane/ozet.tan"
+içe al "kutuphane/HashTablo.tan"
+içe al "kutuphane/araclar.tan"
+
+# dizideIndeksi(dizi, aranan): metin dizisinde lineer arama
+# (HashTablo.tan htKovaIndeksi / event.tan dizideIndeksi ile AYNI
+# desen — kendi yerel kopyası; her modül kendi kopyasını tutar,
+# başka dosyadan import edilmez). Bulunursa indeks, bulunmazsa
+# 0 - 1 döndürür.
+işlev dizideIndeksi(dizi, aranan)
+    i = 0
+    n = uzunluk(dizi)
+    iken i < n
+        mevcut = metinBirlestir("", dizi[i])
+        eğer metinEsit(mevcut, aranan) ise
+            döndür i
+        son
+        i = i + 1
+    son
+    döndür 0 - 1
+son
+
+# bellekAc(kapasite): boş bellek kurar. Kapasite = max eleman
+# sayısı (dolunca en az erişimli anahtar tahliye edilir).
+işlev bellekAc(kapasite)
+    döndür [htYeni(), htYeni(), [], [kapasite]]
+son
+
+# bellekKoy(bellek, anahtar, deger): anahtar-değer yazar,
+# YENİ bellek döndürür (immutable stil).
+#   - Anahtar zaten varsa: değeri günceller (htKoy) ve erişim
+#     sayacını +1 yapar.
+#   - Yeni anahtar VE kapasite doluysa: ÖNCE tahliye eder
+#     (en düşük erişim sayısına sahip anahtar bulunur; ht'den,
+#     erisimSayaci'dan VE anahtarSirasi'ndan çıkarılır), SONRA
+#     yeni anahtarı erişim sayacı 1 ile ekler.
+#   - Yeni anahtar VE kapasite dolu DEĞİLSE: direkt ekler
+#     (erişim sayacı 1, anahtarSirasi'na ekle ile).
+işlev bellekKoy(bellek, anahtar, deger)
+    ht = bellek[0]
+    sayacHt = bellek[1]
+    sira = bellek[2]
+    kutu = bellek[3]
+    eğer htVarMi(ht, anahtar) ise
+        ht = htKoy(ht, anahtar, deger)
+        eskiStr = htAl(sayacHt, anahtar)
+        eski = metneTam(metinBirlestir("", eskiStr))
+        sayacHt = htKoy(sayacHt, anahtar, metin(eski + 1))
+        döndür [ht, sayacHt, sira, kutu]
+    son
+    eğer uzunluk(sira) >= kutu[0] ise
+        # Tahliye: anahtarSirasi içindeki TÜM anahtarları gez,
+        # erisimSayaci'dan sayılarını oku (metneTam ile int'e),
+        # en küçüğü bul. Sayaç kaydı eksikse "" -> metneTam 0
+        # verir -> o anahtar ilk tahliye adayı olur (güvenli).
+        kurbanIdx = 0
+        kurbanSayi = 0 - 1
+        i = 0
+        n = uzunluk(sira)
+        iken i < n
+            aday = metinBirlestir("", sira[i])
+            adayStr = htAl(sayacHt, aday)
+            adaySayi = metneTam(adayStr)
+            eğer kurbanSayi < 0 veya adaySayi < kurbanSayi ise
+                kurbanSayi = adaySayi
+                kurbanIdx = i
+            son
+            i = i + 1
+        son
+        kurban = metinBirlestir("", sira[kurbanIdx])
+        ht = htSil(ht, kurban)
+        sayacHt = htSil(sayacHt, kurban)
+        yeniSira = []
+        j = 0
+        iken j < n
+            eğer j != kurbanIdx ise
+                yeniSira = ekle(yeniSira, metinBirlestir("", sira[j]))
+            son
+            j = j + 1
+        son
+        sira = yeniSira
+    son
+    ht = htKoy(ht, anahtar, deger)
+    sayacHt = htKoy(sayacHt, anahtar, metin(1))
+    sira = ekle(sira, anahtar)
+    döndür [ht, sayacHt, sira, kutu]
+son
+
+# bellekAl(bellek, anahtar): anahtarın değerini döndürür,
+# bulunamazsa "" döner (HashTablo.tan htAl konvansiyonu;
+# çağıran boş dönüşü 'bulunamadi' olarak yorumlar).
+# BASİTLEŞTİRME (dürüst): bu fonksiyon okuma sayacını
+# GUNCELLEMESİN — gerçek LFU okuma sayısını da saymalı ama
+# fonksiyon tek değer döndürdüğü için (imza kısıtı) bu v1'de
+# YOK. Sayacın artması sadece bellekKoy'daki tekrar-yazmada.
+işlev bellekAl(bellek, anahtar)
+    döndür htAl(bellek[0], anahtar)
+son
+
+# bellekIcindeMi(bellek, anahtar): anahtar cache'teyse 1, yoksa 0.
+işlev bellekIcindeMi(bellek, anahtar)
+    döndür htVarMi(bellek[0], anahtar)
+son
+
+# bellekBoyut(bellek): cache'teki eleman sayısı.
+işlev bellekBoyut(bellek)
+    döndür uzunluk(bellek[2])
+son
+
+# bellekSil(bellek, anahtar): anahtarı ht'den, erisimSayaci'dan
+# ve anahtarSirasi dizisinden ÇIKARIR (eventAboneKaldir'daki
+# "index dışındakileri yeni diziye kopyala" deseniyle AYNI),
+# YENİ bellek döndürür. Anahtar yoksa belleği olduğu gibi döndürür.
+işlev bellekSil(bellek, anahtar)
+    ht = bellek[0]
+    eğer htVarMi(ht, anahtar) ise
+        ht = htSil(ht, anahtar)
+    son
+    sayacHt = bellek[1]
+    eğer htVarMi(sayacHt, anahtar) ise
+        sayacHt = htSil(sayacHt, anahtar)
+    son
+    sira = bellek[2]
+    idx = dizideIndeksi(sira, anahtar)
+    eğer idx >= 0 ise
+        yeniSira = []
+        i = 0
+        n = uzunluk(sira)
+        iken i < n
+            eğer i != idx ise
+                yeniSira = ekle(yeniSira, metinBirlestir("", sira[i]))
+            son
+            i = i + 1
+        son
+        sira = yeniSira
+    son
+    döndür [ht, sayacHt, sira, bellek[3]]
+son

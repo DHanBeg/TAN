@@ -234,7 +234,14 @@ başlanmadı) + Isolation/2D (tek-thread sınırı hâlâ geçerli).
 - **Security core:** başlanmadı. `kutuphane/sha256.tan`/`tls.tan` dil-seviyesi kripto kütüphanesi, VETA Security core'a bağlanmadı.
 - **Temporal core:** VETA'da başlanmadı. `kutuphane/TemporalEngine.tan` (NEXUS Katman 3, versiyonlama) var ama `LsmDeposu.tan` üzerine kurulu — VETA'nın PageManager hattına bağlı DEĞİL, doğrulanmadı.
 - **2D eşzamanlılık:** hâlâ SELF katmanında YOK (derleyici-seviyesi iş — futex/thread/lock/atomik codegen TancElf.tan'a hiç eklenmedi, eski Go backend'deki `icParcaLat`/DerleElf.go implementasyonu Go-removal'da silindi, self-hosted derleyiciye taşınmadı). Yüksek risk, ayrı dikkatli oturum gerektirir.
-- **Durum:** Storage+Query+Event bitti (tek-node, eşzamanlılık yok). Sıradaki: Memory core veya Security core (ikisi de kütüphane-seviyesi, derleyiciye dokunmuyor, düşük risk).
+- **Memory core** ✅ TAMAMLANDI (2026-08-23) — `veta/libraries/memory/source/memory.tan`.
+  LFU tahliye + basit key-value cache (HashTablo üzerine, `kayıt`/`sözlük()`
+  KULLANILMADI — bug'lı olduğu bilindiği için). `bellekAc/bellekKoy/bellekAl/
+  bellekIcindeMi/bellekBoyut/bellekSil`. Compression/NUMA/tier-migration
+  KAPSAM DIŞI (dürüst, TAN'da o API yok). Test: `veta/tests/test_memory.tan`
+  — 11/11 GEÇTİ (WSL native), LFU tahliyenin doğru anahtarı seçtiği
+  doğrulandı.
+- **Durum:** Storage+Query+Event+Memory bitti (tek-node, eşzamanlılık yok). Sıradaki: Security core (kütüphane-seviyesi, derleyiciye dokunmuyor, düşük risk).
 
 ## Sonraki Adımlar
 

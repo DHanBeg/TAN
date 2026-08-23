@@ -1,0 +1,51 @@
+# test_memory.tan — VETA Memory Core (bellekAc/bellekKoy/bellekAl/
+# bellekIcindeMi/bellekBoyut/bellekSil) testleri. LFU eviction.
+
+içe al "kutuphane/test.tan"
+içe al "../libraries/memory/source/memory.tan"
+
+gecti = 0
+toplam = 0
+
+bellek = bellekAc(3)
+
+bellek = bellekKoy(bellek, "a", "1")
+bellek = bellekKoy(bellek, "b", "2")
+bellek = bellekKoy(bellek, "c", "3")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(3, bellekBoyut(bellek), "bellekKoy: kapasite dolana kadar buyuyor")
+
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("1", bellekAl(bellek, "a"), "bellekAl: yazilan deger dogru donuyor")
+
+# "a" ve "c"yi tekrar yaz (erisim sayaci artir), "b" bir kere kaldi -> en dusuk erisimli o
+bellek = bellekKoy(bellek, "a", "1-guncel")
+bellek = bellekKoy(bellek, "c", "3-guncel")
+
+# kapasite dolu, yeni anahtar "d" ekleniyor -> en dusuk erisimli ("b") tahliye edilmeli
+bellek = bellekKoy(bellek, "d", "4")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(3, bellekBoyut(bellek), "bellekKoy: tahliye sonrasi boyut kapasitede sabit kaliyor")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, bellekIcindeMi(bellek, "b"), "bellekKoy: en az erisimli (b) tahliye edildi")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, bellekIcindeMi(bellek, "a"), "bellekKoy: sik erisilen (a) hala cache'te")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, bellekIcindeMi(bellek, "c"), "bellekKoy: sik erisilen (c) hala cache'te")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, bellekIcindeMi(bellek, "d"), "bellekKoy: yeni eklenen (d) cache'te")
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("1-guncel", bellekAl(bellek, "a"), "bellekKoy: mevcut anahtar guncellenince deger degisiyor")
+
+# manuel silme
+bellek = bellekSil(bellek, "d")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, bellekIcindeMi(bellek, "d"), "bellekSil: silinen anahtar artik yok")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(2, bellekBoyut(bellek), "bellekSil: boyut azaliyor")
+
+# olmayan key
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("", bellekAl(bellek, "olmayan"), "bellekAl: olmayan key bos donuyor")
+
+d = testSonuc(gecti, toplam)
