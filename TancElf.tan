@@ -1848,6 +1848,41 @@ işlev lockXaddBellek(taban, kaynakHedef)
     döndür [bcBayt(240), bcBayt(rex), bcBayt(15), bcBayt(193), bcBayt(modrmBayt(0, kaynakHedef, taban))]
 son
 
+# mov hedef, [taban+disp8] (8B /r, mod=1) — movPtrOku'nun disp8'li hali,
+# leaDolayli ile AYNI ModRM deseni (opcode 0x8D yerine 0x8B). İplik-blok
+# argüman aktarım alanına (+16, +16+8, ...) erişim için gerekli. taban
+# ASLA rsp/rbp/r12/r13 değil (leaDolayli'deki AYNI kısıt).
+işlev movDolayliOku(hedef, taban, disp)
+    rex = 72
+    eğer hedef >= 8 ise
+        rex = rex + 4
+    son
+    eğer taban >= 8 ise
+        rex = rex + 1
+    son
+    dispBayt = disp
+    eğer disp < 0 ise
+        dispBayt = disp + 256
+    son
+    döndür [bcBayt(rex), bcBayt(139), bcBayt(modrmBayt(1, hedef, taban)), bcBayt(dispBayt)]
+son
+
+# mov [taban+disp8], kaynak (89 /r, mod=1) — movPtrYaz'ın disp8'li hali.
+işlev movDolayliYaz(taban, disp, kaynak)
+    rex = 72
+    eğer kaynak >= 8 ise
+        rex = rex + 4
+    son
+    eğer taban >= 8 ise
+        rex = rex + 1
+    son
+    dispBayt = disp
+    eğer disp < 0 ise
+        dispBayt = disp + 256
+    son
+    döndür [bcBayt(rex), bcBayt(137), bcBayt(modrmBayt(1, kaynak, taban)), bcBayt(dispBayt)]
+son
+
 # shl r64, imm8 (C1 /4)
 işlev shlImm(r, v)
     rex = 72

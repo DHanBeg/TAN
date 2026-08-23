@@ -511,6 +511,35 @@ tabanlı trambolin + r13 register'ının TÜM çağrı zinciri boyunca
 korunması gerekiyor (eski Go implementasyonunda kanıtlanmış desen,
 ama self-hosted derleyiciye taşınması ayrı bir dikkatli oturum ister).
 
+## Ağ Sunucusu ✅ TAMAMLANDI (2026-08-23) — gerçek HTTP/1.0 sunucu, curl ile doğrulandı
+
+`veta/server/source/veta_sunucu.tan` — `araclar/registrys.tan` (Kaldıraç 4,
+kanıtlı çalışan pattern) ile AYNI soket deseni (soketAc/soketDinle/
+soketKabul/soketOku/soketYaz). Query Core'u HTTP üzerinden dışarı açıyor:
+`GET /health`, `GET /get/<key>`, `GET /set/<key>/<deger>`, `GET /del/<key>`.
+
+**Gerçekten çalıştırılıp curl ile test edildi** (WSL native, arka planda
+sunucu + curl istekleri): health→OK, set→OK, get→doğru değer, olmayan
+key→404, del→OK, del-sonrası-get→404, iki bağımsız key birbirini
+etkilemedi. Kalıcılık gerçek (dosya tabanlı Query/Storage, sunucu
+yeniden başlasa veri kalır — Query Core'un kendi test edilmiş
+kalıcılığından miras).
+
+**Bulunan ve düzeltilen 1 bug (yazım sırasında):** İlk taslak
+`baglam = sorguGuncelle(baglam, key, deger)` yazmıştı — ama
+`sorguGuncelle` bağlam (context) DEĞİL, sayfa numarası (int) döndürüyor
+(query.tan'ın kendi tasarımı, storage sayfası aynı kaldığı için index
+güncellemesi gerekmiyor). Context'i bir int ile ezmek SIGSEGV'e yol
+açtı (2. isteğe kadar çalışıp çöküyordu). Düzeltme: `z = sorguGuncelle(...)`
+(dönüş değeri atılıyor, `baglam` HashTablo kutusu zaten referans
+paylaşımıyla güncel kalıyor).
+
+**DÜRÜST SINIR:** Tek-iplik (2D thread creation yok, sıralı istek
+işleme). TLS yok (registrys.tan ile aynı gerekçe). POST body ayrıştırma
+yok — `deger` URL path segmenti (içinde `/` olamaz, v1 sınırı).
+Frontend'e henüz BAĞLANMADI (frontend hâlâ build-time git istatistikleri
+okuyor, bu canlı API'yi henüz kullanmıyor — sonraki iş).
+
 ## Frontend ✅ DOĞRULANDI (2026-08-23) — React+Vite+TS, çalışıyor
 
 `veta/frontend/` — React 19 + Vite 8 + TypeScript, `recharts` (grafik),

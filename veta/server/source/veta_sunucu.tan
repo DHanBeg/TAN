@@ -1,0 +1,135 @@
+# veta_sunucu.tan — VETA gerçek ağ sunucusu (HTTP/1.0, plain TCP).
+# `araclar/registrys.tan` (Kaldıraç 4, kanıtlı çalışan pattern) ile AYNI
+# soket deseni. Central Core'un "routing kararı verir, gerçek çağrıyı
+# çağıran yapar" mimarisine uygun: bu dosya HTTP isteklerini Query
+# Core'un fonksiyonlarına yönlendiren gerçek "çağıran" taraf.
+#
+# DÜRÜST KAPSAM (v1): Tek-iplik (thread creation yok, bkz VETA_STATUS.md
+# 2D notu) — istekler SIRAYLA işlenir, aynı anda tek istemci. TLS yok
+# (registrys.tan ile aynı gerekçe: handshake ayrı büyük iş). POST body
+# ayrıştırma YOK — value'lar URL path segmenti olarak geçiyor (value
+# içinde '/' OLMAMALI, v1 sınırı, dürüst).
+#
+# Rotalar:
+#   GET /health              -> "OK"
+#   GET /get/<key>           -> key'in degeri (Query Core sorguSec), yoksa 404
+#   GET /set/<key>/<deger>   -> sorguEkle/sorguGuncelle (upsert), "OK" doner
+#   GET /del/<key>           -> sorguSil, "OK"/"YOK"
+#
+# Derle: ./TancElf veta/server/source/veta_sunucu.tan veta_sunucu
+# Çalıştır: ./veta_sunucu <port> <db-dosya-yolu>
+#
+# Kullanım (curl):
+#   curl http://localhost:8080/set/ad/demir
+#   curl http://localhost:8080/get/ad          -> demir
+#   curl http://localhost:8080/health          -> OK
+
+içe al "kutuphane/ag.tan"
+içe al "../../libraries/query/source/query.tan"
+
+# yolParcala(yol, ayrac): yol'u ayrac karakterine göre parçalara böler
+# (graph.tan/semantic.tan'daki dizeyeBol ile AYNI yerel-kopya desen).
+işlev yolParcala(yol, ayrac)
+    n = uzunluk(yol)
+    parcalar = []
+    mevcut = ""
+    i = 0
+    iken i < n
+        c = metinAl(yol, i)
+        eğer metinEsit(c, ayrac) ise
+            parcalar = ekle(parcalar, mevcut)
+            mevcut = ""
+        değilse
+            mevcut = metinBirlestir(mevcut, c)
+        son
+        i = i + 1
+    son
+    parcalar = ekle(parcalar, mevcut)
+    döndür parcalar
+son
+
+# istekYolu(istek): "GET /yol HTTP/1.0..." -> "yol" (registrys.tan ile
+# birebir aynı — kanıtlı).
+işlev istekYolu(istek)
+    n = uzunluk(istek)
+    i = 4
+    iken i < n ve metinAl(istek, i) == "/"
+        i = i + 1
+    son
+    yol = ""
+    iken i < n ve metinAl(istek, i) != " "
+        yol = metinBirlestir(yol, metinAl(istek, i))
+        i = i + 1
+    son
+    döndür yol
+son
+
+# httpYanit(istemci, kod, kodMetni, govde): standart HTTP/1.0 yanıtı yazar.
+işlev httpYanit(istemci, kod, kodMetni, govde)
+    uzun = uzunluk(govde)
+    baslik = metinBirlestir(metinBirlestir(metinBirlestir(metinBirlestir("HTTP/1.0 ", metin(kod)), metinBirlestir(" ", kodMetni)), "\r\nContent-Length: "), metinBirlestir(metin(uzun), "\r\nConnection: close\r\n\r\n"))
+    z = soketYaz(istemci, baslik)
+    döndür soketYaz(istemci, govde)
+son
+
+# syToInt: registrys.tan ile aynı (port ayrıştırma).
+işlev syToInt(s)
+    n = uzunluk(s)
+    r = 0
+    i = 0
+    iken i < n
+        k = kod(metinAl(s, i))
+        eğer k >= 48 ve k <= 57 ise
+            r = r * 10 + (k - 48)
+        son
+        i = i + 1
+    son
+    döndür r
+son
+
+port = syToInt(arg(1))
+dbYolu = arg(2)
+baglam = sorguAc(dbYolu)
+
+fd = soketAc()
+addr = sockaddrYap(0, 0, 0, 0, port)
+d = soketDinle(fd, addr)
+yaz(metinBirlestir("VETA sunucusu dinliyor — port ", metin(port)))
+
+iken 1 < 2
+    istemci = soketKabul(fd)
+    eğer istemci >= 0 ise
+        istek = soketOku(istemci, 8192)
+        yol = istekYolu(istek)
+        parcalar = yolParcala(yol, "/")
+        ilkParca = parcalar[0]
+
+        eğer metinEsit(ilkParca, "health") ise
+            z = httpYanit(istemci, 200, "OK", "OK")
+        değilse eğer metinEsit(ilkParca, "get") ve uzunluk(parcalar) >= 2 ise
+            key = parcalar[1]
+            deger = sorguSec(baglam, key)
+            eğer metinEsit(deger, "") ise
+                z = httpYanit(istemci, 404, "Not Found", "bulunamadı")
+            değilse
+                z = httpYanit(istemci, 200, "OK", deger)
+            son
+        değilse eğer metinEsit(ilkParca, "set") ve uzunluk(parcalar) >= 3 ise
+            key = parcalar[1]
+            deger = parcalar[2]
+            z = sorguGuncelle(baglam, key, deger)
+            z = httpYanit(istemci, 200, "OK", "OK")
+        değilse eğer metinEsit(ilkParca, "del") ve uzunluk(parcalar) >= 2 ise
+            key = parcalar[1]
+            silinenSayi = sorguSil(baglam, key)
+            eğer silinenSayi == 1 ise
+                z = httpYanit(istemci, 200, "OK", "OK")
+            değilse
+                z = httpYanit(istemci, 200, "OK", "YOK")
+            son
+        değilse
+            z = httpYanit(istemci, 404, "Not Found", "bilinmeyen rota")
+        son
+        d = soketKapat(istemci)
+    son
+son
