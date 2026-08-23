@@ -1,0 +1,219 @@
+# ============================================================
+# semantic.tan — VETA Semantic Core (vektör depolama + benzerlik arama)
+# ------------------------------------------------------------
+# VETA master prompt Semantic Core tanımı: "embedding, vector storage,
+# similarity, retrieval, filtering, ranking."
+#
+# DÜRÜST KAPSAM (v1): Vektörler TAM SAYI bileşenli (float DEĞİL) —
+# TAN'da metin->ondalık (string->float) dönüşüm fonksiyonu YOK (sadece
+# ondalık->metin var, `metneTam` da yalnız tam sayı ayrıştırır). Bu
+# yüzden vektörleri HashTablo'da (string) SAKLAMAK için tam sayı
+# kullanılıyor (gerçek embedding'ler tipik olarak zaten ölçeklenip
+# int8/int16'ya nicelenebilir — endüstri pratiğinde de yapılan bir şey,
+# "quantized embeddings"). Benzerlik SKORU hesaplanırken float aritmetik
+# kullanılıyor (karekök, bölme) — bu SAKLANMIYOR, sadece anlık hesaplanıp
+# döndürülüyor, o yüzden string round-trip sorunu yok.
+# "embed" (metinden vektör üretme) KAPSAM DIŞI — TAN'da ML/tokenizer
+# yok, bu core sadece HAZIR vektörleri depolayıp aramayı yapıyor.
+# Filtering KAPSAM DIŞI (sadece retrieval+ranking var).
+#
+# Yapı: anlam = [vektorlerHt, idListesi]
+#   vektorlerHt : HashTablo, id -> vektör bileşenlerinin KARAKTER(1) ile
+#     birleştirilmiş metin hali ("3,-1,5" değil KARAKTER(1) ayraçlı)
+#   idListesi   : dizi, TÜM kayıtlı id'ler (HashTablo boyutu doğrudan
+#     okunamadığı için — top-k taraması bunun üzerinde gezer)
+#
+# Kullanım:
+#   içe al "veta/libraries/semantic/source/semantic.tan"
+#   a = anlamAc()
+#   a = anlamVektorEkle(a, "doc1", [1, 2, 3])
+#   a = anlamVektorEkle(a, "doc2", [4, 5, 6])
+#   vek = anlamVektorOku(a, "doc1")             # [1, 2, 3]
+#   skor = anlamBenzerlik([1,2,3], [4,5,6])     # TAM SAYI nokta çarpımı
+#     (kosinüs DEĞİL — çağıran vektörleri önceden normalize etmeli,
+#     bkz anlamBenzerlik yorumu / KRİTİK BULGU 3)
+#   sonuclar = anlamEnBenzerler(a, [1,2,3], 1)  # [["doc1", skor]], azalan sırada
+#
+# NOT: Yeni dil özelliği/keyword EKLENMEDİ — `kayıt`/`sözlük()` KULLANILMADI
+# (TancElf'te sessizce çalışmıyor, bkz VETA_STATUS.md). HER İFADE TEK
+# SATIRDA, `eğer X değilse` YOK (== 0 kullanıldı) — bkz KRİTİK BULGU 2.
+# ============================================================
+
+içe al "kutuphane/ozet.tan"
+içe al "kutuphane/HashTablo.tan"
+içe al "kutuphane/araclar.tan"
+
+# dizideIndeksi(dizi, aranan): lineer arama (event.tan/graph.tan ile
+# aynı yerel-kopya desen).
+işlev dizideIndeksi(dizi, aranan)
+    i = 0
+    n = uzunluk(dizi)
+    iken i < n
+        mevcut = metinBirlestir("", dizi[i])
+        eğer metinEsit(mevcut, aranan) ise
+            döndür i
+        son
+        i = i + 1
+    son
+    döndür 0 - 1
+son
+
+# dizeyeBol(icerik, ayracKarakter): icerik'i ayraca göre parçalara
+# böler (graph.tan ile aynı yerel-kopya desen).
+işlev dizeyeBol(icerik, ayracKarakter)
+    eğer metinEsit(icerik, "") ise
+        döndür []
+    son
+    n = uzunluk(icerik)
+    parcalar = []
+    mevcut = ""
+    i = 0
+    iken i < n
+        c = metinAl(icerik, i)
+        eğer metinEsit(c, ayracKarakter) ise
+            parcalar = ekle(parcalar, mevcut)
+            mevcut = ""
+        değilse
+            mevcut = metinBirlestir(mevcut, c)
+        son
+        i = i + 1
+    son
+    parcalar = ekle(parcalar, mevcut)
+    döndür parcalar
+son
+
+# anlamAc(): boş semantic bağlam kurar.
+işlev anlamAc()
+    döndür [htYeni(), []]
+son
+
+# anlamVektorEkle(a, id, vektorDizisi): vektörü (tam sayı dizisi)
+# id ile ilişkilendirip kaydeder. id zaten varsa üzerine yazar (idListesi'nde
+# tekrarlanmaz). YENİ a döndürür.
+işlev anlamVektorEkle(a, id, vektorDizisi)
+    kodlanmis = ""
+    n = uzunluk(vektorDizisi)
+    i = 0
+    iken i < n
+        eğer i == 0 ise
+            kodlanmis = metin(vektorDizisi[i])
+        değilse
+            kodlanmis = metinBirlestir(metinBirlestir(kodlanmis, karakter(1)), metin(vektorDizisi[i]))
+        son
+        i = i + 1
+    son
+    vektorlerHt = htKoy(a[0], id, kodlanmis)
+    idListesi = a[1]
+    eğer dizideIndeksi(idListesi, id) < 0 ise
+        idListesi = ekle(idListesi, id)
+    son
+    döndür [vektorlerHt, idListesi]
+son
+
+# anlamVektorOku(a, id): id'nin vektörünü (tam sayı dizisi) döndürür,
+# yoksa boş dizi.
+işlev anlamVektorOku(a, id)
+    kodlanmis = htAl(a[0], id)
+    eğer metinEsit(kodlanmis, "") ise
+        döndür []
+    son
+    parcalar = dizeyeBol(kodlanmis, karakter(1))
+    n = uzunluk(parcalar)
+    sonuc = []
+    i = 0
+    iken i < n
+        sonuc = ekle(sonuc, metneTam(metinBirlestir("", parcalar[i])))
+        i = i + 1
+    son
+    döndür sonuc
+son
+
+# anlamBenzerlik(vek1, vek2): TAM SAYI nokta çarpımı (dot product)
+# döndürür — GERÇEK KOSİNÜS BENZERLİĞİ DEĞİL.
+#
+# KRİTİK BULGU 3 (2026-08-23): TancElf'te kullanıcı tanımlı bir
+# işlevin FLOAT parametresi/dönüş değeri BOZUK — en basit
+# `işlev f(x) döndür x son; f(3.5)` bile çöp bit deseni döndürüyor
+# (doğrulandı, VETA_STATUS.md'de kayıtlı). Bu yüzden normalizasyon
+# (karekök + bölme, ikisi de float gerektirir) bu fonksiyonun İÇİNDE
+# YAPILAMAZ. Bunun yerine: ÇAĞIRAN vektörleri ÖNCEDEN normalize edip
+# (örn. birim vektör * 1000 ölçekli tam sayı) buraya öyle vermeli —
+# normalize edilmiş vektörlerde ham nokta çarpımı kosinüs benzerliğiyle
+# ORANTILIDIR (standart "quantized/pre-normalized embedding" tekniği,
+# gerçek arama motorlarında da kullanılır). Normalize edilmemiş
+# vektörlerde skor büyüklüğe duyarlıdır (büyük vektörler yapay olarak
+# yüksek skor alır) — bu dürüstçe bir sınırlama.
+#
+# Vektörler farklı uzunluktaysa KISA olanın uzunluğu kullanılır
+# (dürüst basitleştirme — TAN'da hata fırlatma mekanizması yok).
+işlev anlamBenzerlik(vek1, vek2)
+    n1 = uzunluk(vek1)
+    n2 = uzunluk(vek2)
+    eğer n1 < n2 ise
+        n = n1
+    değilse
+        n = n2
+    son
+    nokta = 0
+    i = 0
+    iken i < n
+        nokta = nokta + vek1[i] * vek2[i]
+        i = i + 1
+    son
+    döndür nokta
+son
+
+# anlamEnBenzerler(a, sorguVektor, k): kayıtlı TÜM vektörlerle
+# sorguVektor arasındaki benzerliği hesaplar, EN YÜKSEK k tanesini
+# azalan sırada [id, skor] çiftleri olarak döndürür (basit selection
+# sort — küçük/orta ölçek için yeterli, büyük ölçekte ayrı bir
+# indeksleme/ANN yapısı gerekir, KAPSAM DIŞI, dürüst). k, kayıt
+# sayısından büyükse tüm kayıtlar döner.
+işlev anlamEnBenzerler(a, sorguVektor, k)
+    idListesi = a[1]
+    n = uzunluk(idListesi)
+    skorlar = []
+    i = 0
+    iken i < n
+        id = metinBirlestir("", idListesi[i])
+        vek = anlamVektorOku(a, id)
+        skor = anlamBenzerlik(sorguVektor, vek)
+        skorlar = ekle(skorlar, [id, skor])
+        i = i + 1
+    son
+    # selection sort - azalan skora göre
+    m = uzunluk(skorlar)
+    i = 0
+    iken i < m
+        enIyiIdx = i
+        j = i + 1
+        iken j < m
+            adayKayit = skorlar[j]
+            enIyiKayit = skorlar[enIyiIdx]
+            adaySkor = adayKayit[1]
+            enIyiSkor = enIyiKayit[1]
+            eğer adaySkor > enIyiSkor ise
+                enIyiIdx = j
+            son
+            j = j + 1
+        son
+        eğer enIyiIdx != i ise
+            gecici = skorlar[i]
+            skorlar[i] = skorlar[enIyiIdx]
+            skorlar[enIyiIdx] = gecici
+        son
+        i = i + 1
+    son
+    eğer k < m ise
+        sinir = k
+    değilse
+        sinir = m
+    son
+    sonuc = []
+    i = 0
+    iken i < sinir
+        sonuc = ekle(sonuc, skorlar[i])
+        i = i + 1
+    son
+    döndür sonuc
+son

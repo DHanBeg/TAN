@@ -1,12 +1,63 @@
-# test_semantic.tan — VETA Semantic (semantic.tan) smoke test
-# Kompilasyon: qemu-x86_64 TancElf <bu_dosya> <cikti>
-# Çalıştırma:  qemu-x86_64 <cikti>
-# Kural: mevcut TancElf binary'sini kullan; Faz 6 zemini (Storage + Query + Transaction + Event + Graph + Semantic hazır); QEMU throttle toleranı.
+# test_semantic.tan — VETA Semantic Core testleri (vektör benzerlik arama).
 
-içe al "../libraries/concurrency/source/semantic.tan"
+içe al "kutuphane/test.tan"
+içe al "../libraries/semantic/source/semantic.tan"
 
-# Basit semantic testi
-yaz("Semantic Test: Kavram tanımı aktif\n")
-yaus("Ilgi durumu: ")
-yaus(IlgiGuncelle(0, 1))
-yaz("\n")
+gecti = 0
+toplam = 0
+
+a = anlamAc()
+a = anlamVektorEkle(a, "ayni-yon", [2, 4, 6])
+a = anlamVektorEkle(a, "ilgisiz", [0, 1, 0])
+a = anlamVektorEkle(a, "zit-yon", [0 - 1, 0 - 2, 0 - 3])
+
+okunanVek = anlamVektorOku(a, "ayni-yon")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(3, uzunluk(okunanVek), "anlamVektorOku: vektor uzunlugu korunmus")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(2, okunanVek[0], "anlamVektorOku: ilk bilesen dogru")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(6, okunanVek[2], "anlamVektorOku: son bilesen dogru")
+
+okunanYok = anlamVektorOku(a, "olmayan")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, uzunluk(okunanYok), "anlamVektorOku: olmayan id bos dizi donuyor")
+
+# ayni yondeki (2,4,6) ile (1,2,3): nokta carpimi 2+8+18=28 (pozitif, yuksek)
+skorAyniYon = anlamBenzerlik([1, 2, 3], [2, 4, 6])
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(28, skorAyniYon, "anlamBenzerlik: ayni yondeki vektorlerin nokta carpimi dogru")
+
+# dik vektorler (1,0) ve (0,1) -> nokta carpimi tam 0
+skorDik = anlamBenzerlik([1, 0], [0, 1])
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, skorDik, "anlamBenzerlik: dik vektorlerin nokta carpimi 0")
+
+# zit yon vektorler -> nokta carpimi negatif: -1-4-9=-14
+skorZit = anlamBenzerlik([1, 2, 3], [0 - 1, 0 - 2, 0 - 3])
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0 - 14, skorZit, "anlamBenzerlik: zit yondeki vektorlerin nokta carpimi negatif")
+
+# sifir vektor ile nokta carpimi 0
+skorSifir = anlamBenzerlik([0, 0, 0], [1, 2, 3])
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, skorSifir, "anlamBenzerlik: sifir vektorun nokta carpimi 0")
+
+# en benzerler - "ayni-yon" sorgu vektoru (1,2,3) ile en yakini kendisi olmali
+enBenzerler = anlamEnBenzerler(a, [1, 2, 3], 2)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(2, uzunluk(enBenzerler), "anlamEnBenzerler: k=2 istenince 2 sonuc donuyor")
+ilkSonuc = enBenzerler[0]
+ilkId = ilkSonuc[0]
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("ayni-yon", ilkId, "anlamEnBenzerler: en benzer olan basta (ayni-yon)")
+ilkSkor = ilkSonuc[1]
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(28, ilkSkor, "anlamEnBenzerler: en benzerin skoru dogru (nokta carpimi 28)")
+
+# k, kayit sayisindan buyukse tumu doner
+tumu = anlamEnBenzerler(a, [1, 2, 3], 100)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(3, uzunluk(tumu), "anlamEnBenzerler: k kayit sayisindan buyukse tum kayitlar doner")
+
+d = testSonuc(gecti, toplam)

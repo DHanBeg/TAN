@@ -2,6 +2,36 @@
 
 *Tarih: 2026-08-17. Son güncelleme — FAZ 1-5 tamamlandı, Faz 6 devam ediyor.*
 
+## ⚠️ KRİTİK BULGU 3 (2026-08-23) — Kullanıcı tanımlı işlevlerde FLOAT parametre/dönüş BOZUK
+
+TancElf'te bir işlevin FLOAT (ondalık) parametresi veya dönüş değeri
+**sessizce çöp bit deseni** üretiyor — en basit örnek bile bozuk:
+```
+işlev ozdesDondur(x)
+    döndür x
+son
+z = ozdesDondur(3.5)   # z artik 3.5 DEGIL, cop bir buyuk sayi
+```
+Doğrulandı: top-level (fonksiyon dışı) float aritmetik/döngü TAMAMEN
+DOĞRU çalışıyor (Newton karekök yöntemi top-level'de 3.741657 doğru
+sonucu verdi), ama AYNI mantık `işlev...son` içine alınınca (float
+parametre alan/döndüren) bozuluyor. `karekök()` (kutuphane/Matematik.tan)
+bu yüzden float argümanla ÇAĞRILAMAZ — Semantic core yazılırken
+`karekök(kareToplam*1.0)` denendi, sıfıra bölme hatasına kadar gitti
+(`tahmin` değişkeni bozuk float bit deseninden dolayı 0'a yakınsadı).
+
+**Sonuç:** VETA'da (ve TAN'da genel olarak) **float içeren HERHANGİ bir
+kütüphane fonksiyonu şu an güvenilmez**. Kosinüs benzerliği, gerçek
+istatistik, ondalık hesaplama gerektiren HER core bu kısıtla karşılaşır.
+`veta/libraries/semantic/source/semantic.tan` bu yüzden float'tan
+TAMAMEN kaçınıp SADECE tam sayı nokta çarpımı (dot product) kullanacak
+şekilde tasarlandı — gerçek kosinüs benzerliği DEĞİL, çağıranın
+vektörleri ÖNCEDEN normalize etmesi gerekiyor (bkz semantic.tan
+`anlamBenzerlik` yorumu). **Bu derleyici bug'ı ayrı, öncelikli bir iş
+olarak ele alınmalı** — çözülene kadar VETA'nın istatistik/AI-ağırlıklı
+core'ları (Optimizer'ın "adaptive/AI-assisted" fazı, AI Memory'nin
+skorlama kısımları vb.) bu sınırla kısıtlı kalacak.
+
 ## ⚠️ KRİTİK BULGU 2 (2026-08-23) — TancElf iki durumda SESSİZCE yanlış derliyor
 
 1. **Çok satırlı ifade:** Bir ifade (örn. iç içe `metinBirlestir(...)` zinciri)
@@ -311,7 +341,18 @@ başlanmadı) + Isolation/2D (tek-thread sınırı hâlâ geçerli).
   `kutuphane/Grafik.tan` (ASCII chart, graph algoritması DEĞİL)
   KULLANILMADI. Test: `veta/tests/test_graph.tan` (eski smoke-stub
   değiştirildi) — 17/17 GEÇTİ (WSL native).
-- **Durum:** Storage+Query+Event+Memory+Security+Temporal+Observability+Graph bitti (tek-node, eşzamanlılık yok). Sıradaki: Central Core veya Distributed/Semantic/AI Memory/Optimizer/Plugin/Autonomy/Evolution (hepsi sıfır kod).
+- **Semantic core** ✅ TAMAMLANDI (2026-08-23) — `veta/libraries/semantic/source/semantic.tan`.
+  `anlamAc/anlamVektorEkle/anlamVektorOku/anlamBenzerlik/anlamEnBenzerler`.
+  Vektörler TAM SAYI (float değil — KRİTİK BULGU 3, yukarı bakın).
+  `anlamBenzerlik` gerçek kosinüs DEĞİL, ham nokta çarpımı (çağıran
+  önceden normalize etmeli). `anlamEnBenzerler` top-k selection sort ile
+  azalan skor sıralaması. "embed" (metinden vektör üretme) ve filtering
+  KAPSAM DIŞI (dürüst). Test: `veta/tests/test_semantic.tan` (eski
+  smoke-stub değiştirildi) — 12/12 GEÇTİ (WSL native). Bu core
+  yazılırken KRİTİK BULGU 3 keşfedildi (orijinal kosinüs tasarımı
+  sıfıra bölme hatasına düştü, kök neden izole edilip belgelenip
+  tasarım tam sayıya çevrildi).
+- **Durum:** Storage+Query+Event+Memory+Security+Temporal+Observability+Graph+Semantic bitti (tek-node, eşzamanlılık yok, float fonksiyonlar bozuk). Sıradaki: Central Core veya Distributed/AI Memory/Optimizer/Plugin/Autonomy/Evolution (hepsi sıfır kod).
 
 ## Sonraki Adımlar
 
