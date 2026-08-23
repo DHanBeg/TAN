@@ -1,0 +1,181 @@
+# ============================================================
+# autonomy.tan — VETA Autonomy Core (gözlem->anlama->plan->politika->
+# yürütme->doğrulama durum makinesi)
+# ------------------------------------------------------------
+# VETA master prompt Autonomy Core tanımı: "OBSERVE -> UNDERSTAND -> PLAN
+# -> SIMULATE -> POLICY CHECK -> EXECUTE -> VERIFY -> ROLLBACK/PROMOTE.
+# Kontrolsüz mutation yasak."
+#
+# DÜRÜST KAPSAM (v1): SIMULATE KAPSAM DIŞI (TAN'da izolasyon/sandbox yok,
+# Optimizer core'daki aynı sınırla tutarlı). UNDERSTAND gerçek bir NLU/
+# anlam çıkarımı YAPMAZ — sadece pipeline'da bir aşama olarak durumu
+# ilerletir (dürüst). GERÇEK YÜRÜTME (dinamik kod çalıştırma) YOK — TAN'da
+# fonksiyon-değeri yok (Central Core'daki AYNI sınır). Bu core'un asıl
+# katkısı: **"kontrolsüz mutation yasak" ilkesini durum makinesi ile
+# ZORUNLU KILMAK** — `otonomiYurut` SADECE POLİTİKA ONAYLANMIŞ (durum=3)
+# bir aksiyon için çalışır, başka HİÇBİR durumdan doğrudan yürütmeye
+# geçilemez (derleme-zamanı değil ama ÇALIŞMA-ZAMANI garantili — geçersiz
+# geçiş sessizce reddedilir, Plugin Core'daki state machine deseniyle
+# aynı).
+#
+# Durum makinesi:
+#   0 GOZLEMLENDI -> 1 ANLASILDI -> 2 PLANLANDI -> [3 ONAYLANDI | 7 REDDEDILDI]
+#   3 ONAYLANDI -> 4 YURUTULDU -> [5 DOGRULANDI(promote) | 6 GERI_ALINDI(rollback)]
+#   7 REDDEDILDI: son durum (politika reddetti, asla yürütülemez)
+#
+# Yapı: o = [aksiyonlarListesi, aksiyonIndeksHt]
+#   aksiyonlarListesi : dizi [id, tip, hedef, gerekce, durum]
+#   aksiyonIndeksHt   : HashTablo, id(metin) -> aksiyonlarListesi indeksi
+#
+# Kullanım:
+#   içe al "veta/libraries/autonomy/source/autonomy.tan"
+#   o = otonomiAc()
+#   o = otonomiGozlemle(o, "cache_boyutu_ayarla", "memory-core", "bellek baskisi tespit edildi")
+#   id = otonomiSonId(o)
+#   o = otonomiAnla(o, id)                              # 0->1
+#   o = otonomiPlanla(o, id)                             # 1->2
+#   o = otonomiPolitikaOnayla(o, id, ["cache_boyutu_ayarla"])  # 2->3 (izinliyse)
+#   o = otonomiYurut(o, id)                              # SADECE 3->4
+#   o = otonomiDogrula(o, id, 1)                          # 4->5 (basariliysa)
+#
+# NOT: Yeni dil özelliği/keyword EKLENMEDİ. `kayıt`/`sözlük()` KULLANILMADI.
+# HER İFADE TEK SATIRDA, `eğer X değilse` YOK (== 0) — bkz KRİTİK BULGU 2.
+# Float YOK (bkz KRİTİK BULGU 3).
+# ============================================================
+
+içe al "kutuphane/ozet.tan"
+içe al "kutuphane/HashTablo.tan"
+içe al "kutuphane/araclar.tan"
+
+# dizideIndeksi(dizi, aranan): lineer arama (diğer core'larla aynı
+# yerel-kopya desen).
+işlev dizideIndeksi(dizi, aranan)
+    i = 0
+    n = uzunluk(dizi)
+    iken i < n
+        mevcut = metinBirlestir("", dizi[i])
+        eğer metinEsit(mevcut, aranan) ise
+            döndür i
+        son
+        i = i + 1
+    son
+    döndür 0 - 1
+son
+
+# otonomiAc(): boş Autonomy Core bağlamı kurar.
+işlev otonomiAc()
+    döndür [[], htYeni()]
+son
+
+# otonomiGozlemle(o, tip, hedef, gerekce): "OBSERVE" — yeni bir aksiyon
+# adayı kaydeder (durum=0 GOZLEMLENDI). YENİ o döndürür.
+işlev otonomiGozlemle(o, tip, hedef, gerekce)
+    aksiyonlarListesi = o[0]
+    id = uzunluk(aksiyonlarListesi) + 1
+    kayit = [id, tip, hedef, gerekce, 0]
+    aksiyonlarListesi = ekle(aksiyonlarListesi, kayit)
+    indeksHt = htKoy(o[1], metin(id), metin(uzunluk(aksiyonlarListesi) - 1))
+    döndür [aksiyonlarListesi, indeksHt]
+son
+
+# otonomiSonId(o): en son gözlemlenen aksiyonun id'sini döndürür.
+işlev otonomiSonId(o)
+    aksiyonlarListesi = o[0]
+    n = uzunluk(aksiyonlarListesi)
+    eğer n == 0 ise
+        döndür 0 - 1
+    son
+    sonKayit = aksiyonlarListesi[n - 1]
+    döndür sonKayit[0]
+son
+
+# otonomiDurum(o, id): aksiyonun durumunu döndürür, bulunamazsa 0-1.
+işlev otonomiDurum(o, id)
+    indeksStr = htAl(o[1], metin(id))
+    eğer metinEsit(indeksStr, "") ise
+        döndür 0 - 1
+    son
+    indeks = metneTam(indeksStr)
+    aksiyonlarListesi = o[0]
+    kayit = aksiyonlarListesi[indeks]
+    döndür kayit[4]
+son
+
+# otonomiGecisYap(o, id, beklenenOncekiDurum, yeniDurum): İÇ yardımcı —
+# durum SADECE beklenenOncekiDurum ise yeniDurum'a geçer (Plugin
+# Core'daki pluginGecisYap ile aynı desen — bu, "kontrolsüz mutation
+# yasak" ilkesinin uygulama mekanizmasıdır).
+işlev otonomiGecisYap(o, id, beklenenOncekiDurum, yeniDurum)
+    indeksStr = htAl(o[1], metin(id))
+    eğer metinEsit(indeksStr, "") ise
+        döndür o
+    son
+    indeks = metneTam(indeksStr)
+    aksiyonlarListesi = o[0]
+    kayit = aksiyonlarListesi[indeks]
+    eğer kayit[4] == beklenenOncekiDurum ise
+        kayit[4] = yeniDurum
+    son
+    döndür o
+son
+
+# otonomiAnla(o, id): "UNDERSTAND" — 0(GOZLEMLENDI) -> 1(ANLASILDI).
+işlev otonomiAnla(o, id)
+    döndür otonomiGecisYap(o, id, 0, 1)
+son
+
+# otonomiPlanla(o, id): "PLAN" — 1(ANLASILDI) -> 2(PLANLANDI).
+işlev otonomiPlanla(o, id)
+    döndür otonomiGecisYap(o, id, 1, 2)
+son
+
+# otonomiPolitikaOnayla(o, id, izinliTipler): "POLICY CHECK" — aksiyon
+# 2(PLANLANDI) durumundaysa VE tipi izinliTipler listesindeyse
+# 3(ONAYLANDI)'ya geçer; PLANLANDI durumunda ama tipi izinli DEĞİLSE
+# 7(REDDEDILDI)'ye geçer (kalıcı, geri dönüşü yok — güvenlik için).
+# PLANLANDI durumunda değilse (örn. henüz gözlemlenmiş/anlaşılmış ama
+# planlanmamış) hiçbir şey yapmaz. YENİ o döndürür.
+işlev otonomiPolitikaOnayla(o, id, izinliTipler)
+    indeksStr = htAl(o[1], metin(id))
+    eğer metinEsit(indeksStr, "") ise
+        döndür o
+    son
+    indeks = metneTam(indeksStr)
+    aksiyonlarListesi = o[0]
+    kayit = aksiyonlarListesi[indeks]
+    eğer kayit[4] == 2 ise
+        tip = kayit[1]
+        eğer dizideIndeksi(izinliTipler, tip) >= 0 ise
+            kayit[4] = 3
+        değilse
+            kayit[4] = 7
+        son
+    son
+    döndür o
+son
+
+# otonomiYurut(o, id): "EXECUTE" — SADECE 3(ONAYLANDI) durumundaki bir
+# aksiyon 4(YURUTULDU)'ya geçebilir. Bu, "kontrolsüz mutation yasak"
+# ilkesinin ÇALIŞMA-ZAMANI garantisidir: politika onayı olmayan (veya
+# reddedilmiş) bir aksiyon HİÇBİR ŞEKİLDE bu durumdan geçemez. GERÇEK
+# yan etkiyi (asıl mutasyonu) bu fonksiyon YAPMAZ — TAN'da dinamik
+# çağrı yok, çağıran GERÇEK işlemi kendisi yapıp SONRA bu fonksiyonu
+# çağırır (Central Core'daki routing kararı ile aynı felsefe).
+işlev otonomiYurut(o, id)
+    döndür otonomiGecisYap(o, id, 3, 4)
+son
+
+# otonomiDogrula(o, id, basariliMi): "VERIFY" + "ROLLBACK/PROMOTE" —
+# 4(YURUTULDU) durumundaki aksiyon: basariliMi=1 ise 5(DOGRULANDI,
+# promote), basariliMi=0 ise 6(GERI_ALINDI, rollback)'ya geçer.
+işlev otonomiDogrula(o, id, basariliMi)
+    eğer basariliMi == 1 ise
+        döndür otonomiGecisYap(o, id, 4, 5)
+    son
+    döndür otonomiGecisYap(o, id, 4, 6)
+son
+
+# otonomiAksiyonSayisi(o): toplam aksiyon sayısı (durumu ne olursa olsun).
+işlev otonomiAksiyonSayisi(o)
+    döndür uzunluk(o[0])
+son

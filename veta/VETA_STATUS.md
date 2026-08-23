@@ -406,7 +406,20 @@ başlanmadı) + Isolation/2D (tek-thread sınırı hâlâ geçerli).
   zorunlu değil, composition ile eklenebilir. Test:
   `veta/tests/test_plugin.tan` — 18/18 GEÇTİ (WSL native), geçersiz geçiş
   reddi + restart + kaldırma-sonrası-kilit senaryoları dahil.
-- **Durum:** Storage+Query+Event+Memory+Security+Temporal+Observability+Graph+Semantic+AI Memory+Central Core+Optimizer+Plugin bitti (tek-node, eşzamanlılık yok, float fonksiyonlar bozuk, dinamik dispatch yok). Sıradaki: Distributed/Autonomy/Evolution (hepsi sıfır kod).
+- **Autonomy core** ✅ TAMAMLANDI (2026-08-23) — `veta/libraries/autonomy/source/autonomy.tan`.
+  `otonomiAc/otonomiGozlemle/otonomiSonId/otonomiDurum/otonomiAnla/
+  otonomiPlanla/otonomiPolitikaOnayla/otonomiYurut/otonomiDogrula/
+  otonomiAksiyonSayisi`. Durum makinesi: GOZLEMLENDI(0)→ANLASILDI(1)→
+  PLANLANDI(2)→[ONAYLANDI(3)|REDDEDILDI(7)]→YURUTULDU(4)→[DOGRULANDI(5)
+  promote|GERI_ALINDI(6) rollback]. **"Kontrolsüz mutation yasak" ilkesi
+  gerçekten zorlanıyor:** `otonomiYurut` SADECE durum=3(ONAYLANDI) ise
+  çalışır — politika onayı olmayan/reddedilmiş hiçbir aksiyon hiçbir
+  şekilde yürütme durumuna geçemez (test edildi: onaysız + reddedilmiş
+  iki ayrı senaryoda da geçiş engellendi). SIMULATE ve gerçek dinamik
+  yürütme (dynamic dispatch, TAN'da fonksiyon-değeri yok) KAPSAM DIŞI —
+  Central/Plugin core'larla aynı sınır. Test:
+  `veta/tests/test_autonomy.tan` — 14/14 GEÇTİ (WSL native).
+- **Durum:** Storage+Query+Event+Memory+Security+Temporal+Observability+Graph+Semantic+AI Memory+Central Core+Optimizer+Plugin+Autonomy bitti (tek-node, eşzamanlılık yok, float fonksiyonlar bozuk, dinamik dispatch yok). Sıradaki: Distributed/Evolution (hepsi sıfır kod).
 
 ## Sonraki Adımlar
 

@@ -1,0 +1,87 @@
+# test_autonomy.tan — VETA Autonomy Core testleri.
+# observe->understand->plan->policy->execute->verify/rollback,
+# "kontrolsuz mutation yasak" ilkesinin durum makinesiyle zorlanmasi dahil.
+
+içe al "kutuphane/test.tan"
+içe al "../libraries/autonomy/source/autonomy.tan"
+
+gecti = 0
+toplam = 0
+
+o = otonomiAc()
+o = otonomiGozlemle(o, "cache_boyutu_ayarla", "memory-core", "bellek baskisi tespit edildi")
+id1 = otonomiSonId(o)
+
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, otonomiDurum(o, id1), "otonomiGozlemle: yeni aksiyon GOZLEMLENDI(0)")
+
+# KRITIK: politika onayi olmadan DOGRUDAN yurutme denenirse RED edilmeli
+o = otonomiYurut(o, id1)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, otonomiDurum(o, id1), "otonomiYurut: onaysiz yurutme reddedildi (kontrolsuz mutation yasak), hala GOZLEMLENDI(0)")
+
+o = otonomiAnla(o, id1)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, otonomiDurum(o, id1), "otonomiAnla: 0->1 ANLASILDI")
+
+o = otonomiPlanla(o, id1)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(2, otonomiDurum(o, id1), "otonomiPlanla: 1->2 PLANLANDI")
+
+# planlandi durumundan da hala dogrudan yurutme reddedilmeli (onay yok)
+o = otonomiYurut(o, id1)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(2, otonomiDurum(o, id1), "otonomiYurut: planlandi ama onaysiz - hala reddediliyor, PLANLANDI(2)")
+
+# politika onayi - izinli tip
+izinliTipler = ["cache_boyutu_ayarla", "index_yeniden_olustur"]
+o = otonomiPolitikaOnayla(o, id1, izinliTipler)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(3, otonomiDurum(o, id1), "otonomiPolitikaOnayla: izinli tip 2->3 ONAYLANDI")
+
+# SIMDI yurutme calismali
+o = otonomiYurut(o, id1)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(4, otonomiDurum(o, id1), "otonomiYurut: onaylandiktan sonra 3->4 YURUTULDU")
+
+# verify - basarili -> promote
+o = otonomiDogrula(o, id1, 1)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(5, otonomiDurum(o, id1), "otonomiDogrula: basarili 4->5 DOGRULANDI(promote)")
+
+# ikinci aksiyon - izinli olmayan tip - politika reddetmeli
+o = otonomiGozlemle(o, "sistem_kapat", "core", "supheli aktivite")
+id2 = otonomiSonId(o)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(2, id2, "otonomiGozlemle: ikinci aksiyon id=2")
+
+o = otonomiAnla(o, id2)
+o = otonomiPlanla(o, id2)
+o = otonomiPolitikaOnayla(o, id2, izinliTipler)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(7, otonomiDurum(o, id2), "otonomiPolitikaOnayla: izinli olmayan tip 2->7 REDDEDILDI")
+
+# REDDEDILDI durumundan yurutme ASLA calismamali
+o = otonomiYurut(o, id2)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(7, otonomiDurum(o, id2), "otonomiYurut: reddedilmis aksiyon asla yurutulemez, hala REDDEDILDI(7)")
+
+# ucuncu aksiyon - basarisiz calisma -> rollback
+o = otonomiGozlemle(o, "cache_boyutu_ayarla", "memory-core", "test")
+id3 = otonomiSonId(o)
+o = otonomiAnla(o, id3)
+o = otonomiPlanla(o, id3)
+o = otonomiPolitikaOnayla(o, id3, izinliTipler)
+o = otonomiYurut(o, id3)
+o = otonomiDogrula(o, id3, 0)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(6, otonomiDurum(o, id3), "otonomiDogrula: basarisiz 4->6 GERI_ALINDI(rollback)")
+
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(3, otonomiAksiyonSayisi(o), "otonomiAksiyonSayisi: toplam 3 aksiyon")
+
+# olmayan id
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0 - 1, otonomiDurum(o, 999), "otonomiDurum: olmayan id icin -1")
+
+d = testSonuc(gecti, toplam)
