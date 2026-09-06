@@ -1,0 +1,39 @@
+# dosyaSenkron_testleri.tan — fsync yerleşiğinin KALICI regresyonu.
+#
+# NEDEN VAR: VETA WAL fizibilite denetimi (2026-09-07) önce iddiaya
+# güvenmedi ("dosyaSenkron zaten var" diyen önceki hafıza notu bu HEAD'de
+# YANLIŞ çıktı — TancElf.tan'da fsync HİÇ tanımlı değildi, sadece yorumda
+# "fsync YOK" diye belgelenmişti), sonra kanıtladı: repo-dışı geçici
+# kopyada ekleyip davranışsal (açık fd->0, kapalı fd->-9 EBADF) + statik
+# (objdump'ta sys_fsync=74 syscall) kanıt üretti. Bu dosya o kanıtın
+# KALICI KAYDIDIR — geçici probe değil, testler/*_testleri.tan glob'una
+# girer, TestAraclar.sh otomatik koşar.
+#
+# Stub/no-op regresyonuna karşı özellikle nişanlı: eğer dosyaSenkron
+# ileride sessizce syscall yapmaz hale gelirse (ör. birisi yanlışlıkla
+# retBant()'i syscallEmit()'ten önceye taşırsa), kapalı-fd testi 0
+# dönmeye başlar (gerçek syscall olmadığı için hata da olmaz) — bu test
+# onu YAKALAR.
+
+içe al "kutuphane/test.tan"
+
+gecti = 0
+toplam = 0
+
+# --- açık fd üzerinde fsync: başarı (0) bekleniyor ---
+yol = "/tmp/tan_test_dosyaSenkron.tmp"
+fd = dosyaAc(yol, 1)
+z = dosyaYazKonum(fd, 0, "veri")
+sonucAcik = dosyaSenkron(fd)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, sonucAcik, "dosyaSenkron: acik fd uzerinde basari (0)")
+
+# --- kapali fd üzerinde fsync: EBADF (-9) bekleniyor — GERÇEK syscall'in
+# kernele ulaştığının kanıtı (stub/no-op olsaydı ikisi de AYNI sabiti
+# dönerdi, ör. ikisi de 0) ---
+z = dosyaKapat(fd)
+sonucKapali = dosyaSenkron(fd)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0 - 9, sonucKapali, "dosyaSenkron: kapali fd uzerinde EBADF (-9) - gercek syscall kaniti")
+
+d = testSonuc(gecti, toplam)

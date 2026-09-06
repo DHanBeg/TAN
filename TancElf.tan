@@ -3762,6 +3762,20 @@ işlev dosyaKapatBant()
     döndür listeBirlestir(b, retBant())
 son
 
+# dosyaSenkron(fd) -> fsync(fd) (sys_fsync=74). WAL/durability için: veri
+# OS sayfa önbelleğinden fiziksel diske indiğinin garantisi. Basari 0,
+# hata negatif (ör. kapali fd -> -9 EBADF) - dosyaKapatBant ile BİREBİR
+# AYNI kalıp (rdi=fd zaten generic CAGRI dispatch tarafından konmuş,
+# tek syscall, ret rax=sonuç). Kanıt: VETA WAL fizibilite denetimi
+# (2026-09-07) - açık fd->0, kapalı fd->-9 (davranışsal) + objdump'ta
+# `mov $0x4a,%rax` + `syscall` (statik, 0x4a=74=sys_fsync).
+işlev dosyaSenkronBant()
+    b = [bcEtiket("f_dosyaSenkron")]
+    b = listeBirlestir(b, movImm32(0, 74))           # sys_fsync (rdi=fd zaten yerinde)
+    b = listeBirlestir(b, syscallEmit())
+    döndür listeBirlestir(b, retBant())
+son
+
 # ---------------- 2D EŞZAMANLILIK: mmap + ham bellek + futex + kilit + atomik ----------------
 # VETA_STATUS.md FAZ5_BLOCKED_KATALOGU 2D maddesi. Eski Go backend'deki
 # (DerleElf.go, commit 2976ac8, Go-removal'da silindi) icParcaLat/futex/
@@ -5647,8 +5661,8 @@ degiskenSayisi = uzunluk(adlarKutu[0])
 cerceveBoy = 8 * degiskenSayisi + 16
 
 # --- Faz 5 (B): kullanılan yardımcı kümesini govde bandından çıkar ---
-yardimciAdlar = ["yaz_sayi", "f_tan_ayir", "f_bellek_kopyala", "f_liste_ekle", "f_liste_yap", "f_sayi_metne", "f_metin_birlestir", "f_metin_esit", "f_metin_indeks", "f_kod", "f_karakter", "f_yaz_metin", "f_yazHam", "f_zaman", "f_soketAc", "f_soketBagla", "f_soketYaz", "f_soketOku", "f_soketKapat", "f_soketDinle", "f_soketKabul", "f_catal", "f_izle", "f_calistir", "f_bekle", "f_izleRegs", "f_oku", "f_yazDosya", "f_yazDosyaCalistirilabilir", "f_dosyaAc", "f_dosyaOkuKonum", "f_dosyaYazKonum", "f_dosyaKapat", "f_girdiOku", "f_girdiOkuN", "f_dosyaVarMi", "f_yazBaytlar", "f_argsay", "f_arg", "f_kesir_metne", "f_yaz_kesir", "f_hata_sifira_bolme", "f_bellekEsle", "f_hamOku8", "f_hamYaz8", "f_futexWait", "f_futexWake", "f_kilitOlustur", "f_kilitle", "f_kilidiAc", "f_atomikEkleHam"]
-yardimciBantlar = [yazSayiBant(), tanAyirBant(), bellekKopyalaBant(), listeEkleBant(), listeYapBant(), sayiMetneBant(), metinBirlestirBant(), metinEsitBant(), metinIndeksBant(), kodBant(), karakterBant(), yazMetinBant(), yazHamBant(), zamanBant(), soketAcBant(), soketBaglaBant(), soketYazBant(), soketOkuBant(), soketKapatBant(), soketDinleBant(), soketKabulBant(), catalBant(), izleBant(), calistirBant(), bekleBant(), izleRegsBant(), okuBant(), yazDosyaBant(), yazDosyaCalistirilabilirBant(), dosyaAcBant(), dosyaOkuKonumBant(), dosyaYazKonumBant(), dosyaKapatBant(), girdiOkuBant(), girdiOkuNBant(), dosyaVarMiBant(), yazBaytlarBant(), argsayBant(), argBant(), kesirMetneBant(), yazKesirBant(), hataSifiraBolmeBant(), bellekEsleBant(), hamOku8Bant(), hamYaz8Bant(), futexWaitBant(), futexWakeBant(), kilitOlusturBant(), kilitleBant(), kilidiAcBant(), atomikEkleHamBant()]
+yardimciAdlar = ["yaz_sayi", "f_tan_ayir", "f_bellek_kopyala", "f_liste_ekle", "f_liste_yap", "f_sayi_metne", "f_metin_birlestir", "f_metin_esit", "f_metin_indeks", "f_kod", "f_karakter", "f_yaz_metin", "f_yazHam", "f_zaman", "f_soketAc", "f_soketBagla", "f_soketYaz", "f_soketOku", "f_soketKapat", "f_soketDinle", "f_soketKabul", "f_catal", "f_izle", "f_calistir", "f_bekle", "f_izleRegs", "f_oku", "f_yazDosya", "f_yazDosyaCalistirilabilir", "f_dosyaAc", "f_dosyaOkuKonum", "f_dosyaYazKonum", "f_dosyaKapat", "f_girdiOku", "f_girdiOkuN", "f_dosyaVarMi", "f_dosyaSenkron", "f_yazBaytlar", "f_argsay", "f_arg", "f_kesir_metne", "f_yaz_kesir", "f_hata_sifira_bolme", "f_bellekEsle", "f_hamOku8", "f_hamYaz8", "f_futexWait", "f_futexWake", "f_kilitOlustur", "f_kilitle", "f_kilidiAc", "f_atomikEkleHam"]
+yardimciBantlar = [yazSayiBant(), tanAyirBant(), bellekKopyalaBant(), listeEkleBant(), listeYapBant(), sayiMetneBant(), metinBirlestirBant(), metinEsitBant(), metinIndeksBant(), kodBant(), karakterBant(), yazMetinBant(), yazHamBant(), zamanBant(), soketAcBant(), soketBaglaBant(), soketYazBant(), soketOkuBant(), soketKapatBant(), soketDinleBant(), soketKabulBant(), catalBant(), izleBant(), calistirBant(), bekleBant(), izleRegsBant(), okuBant(), yazDosyaBant(), yazDosyaCalistirilabilirBant(), dosyaAcBant(), dosyaOkuKonumBant(), dosyaYazKonumBant(), dosyaKapatBant(), girdiOkuBant(), girdiOkuNBant(), dosyaVarMiBant(), dosyaSenkronBant(), yazBaytlarBant(), argsayBant(), argBant(), kesirMetneBant(), yazKesirBant(), hataSifiraBolmeBant(), bellekEsleBant(), hamOku8Bant(), hamYaz8Bant(), futexWaitBant(), futexWakeBant(), kilitOlusturBant(), kilitleBant(), kilidiAcBant(), atomikEkleHamBant()]
 kullanilanYardimcilar = yardimciKullanimiTara(govde, yardimciAdlar)
 gomulcekYardimcilar = yardimciKapanisi(kullanilanYardimcilar)
 
