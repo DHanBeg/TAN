@@ -1,7 +1,16 @@
 # ============================================================
 # derleyici_sonsuz_dongu.tan — DONMUŞ REGRESYON (2026-09-06, Faz 2-a)
 # ------------------------------------------------------------
-# BU DOSYA KASITLI OLARAK TancElf'i SONSUZA KADAR ASAR. TestAraclar.sh'nin
+# ÇÖZÜLDÜ (Faz 2-b, commit 39bae3e): kök neden islevGovdeSonBul'un
+# "değilse eğer" zincirini yanlış derinlik saymasıydı — bkz. TancElf.tan
+# içindeki islevGovdeSonBul'un başındaki yorum. Bu dosya artık TAKILMIYOR,
+# hızlı ve temiz `BAGLAMA HATASI: etiket bulunamadi: f_sözlük` veriyor
+# (sözlük() zaten Faz 1'den beri yok — cikis kodu 0 DEĞİL, 1 bekleniyor,
+# önemli olan 124/timeout OLMAMASI). Regresyon fixture'ı olarak KALICI:
+# gelecekte bu bug geri gelirse (yanlış refactor vb.) burada yakalanır.
+# ------------------------------------------------------------
+# BU DOSYA KASITLI OLARAK TancElf'i SONSUZA KADAR ASAR (DÜZELTMEDEN ÖNCEKİ
+# HALİYLE — artık asmıyor, bkz yukarı). TestAraclar.sh'nin
 # `testler/*_testleri.tan` glob'una GİRMEYECEK ŞEKİLDE (bu alt dizinde,
 # ayrı isim deseninde) yerleştirildi — normal regresyon koşusunu kilitlemesin
 # diye. Bu dosyayı SADECE `timeout N ./TancElf ... ` ile, elle çalıştır.
@@ -33,10 +42,12 @@
 #      DONDURULMUŞ KOPYA olarak birebir gömülü) ARDINDAN geldiğinde ortaya
 #      çıkıyor. İlk 105 satır (yaprakBol HARİÇ) yeterli DEĞİL — donma yok,
 #      temiz `BAGLAMA HATASI: etiket bulunamadi: f_sözlük` veriyor. yaprakBol
-#      dahil olunca (111-128 satır) donma başlıyor. Yani hem (a) belli bir
-#      önceki kod karmaşıklığı hem (b) elif-içinde-foreach ikisi BİRLİKTE
-#      gerekiyor — sebep TAM OLARAK NEREDE (blokDerle içinde hangi satır)
-#      HENÜZ BULUNMADI, bu Faz 2-b'nin işi.
+#      dahil olunca (111-128 satır) donma başlıyor. GERÇEK SEBEP (Faz 2-b'de
+#      bulundu): "belli bir önceki karmaşıklık" aslında sadece "dosyada
+#      BAŞKA bir top-level çağrı olması" (reachability budamasını aktif
+#      eden şart, TancElf.tan satır ~1007) — foreach de gerekli değildi,
+#      düz `eğer/değilse eğer` tek başına da (foreach'siz) aynı şekilde
+#      donduruyordu (bkz C4 testi, fix commit mesajında).
 #
 #   4) sözlük() ile İLGİSİZ olduğu doğrulandı: bu dosyadaki sözlük()
 #      çağrıları (kYaprakMi/kAnahtarlar/vb.) zaten link aşamasında ayrı
@@ -45,15 +56,13 @@
 #      donma davranışını DEĞİŞTİRMEDİ (denendi: sözlük() çağrıları çıkarılıp
 #      düz skaler değişkenle değiştirilince de aynı donma sürdü).
 #
-# YENİDEN ÜRETME:
+# YENİDEN ÜRETME (regresyon kontrolü):
 #   cd tan/ (repo kökü)
 #   timeout 10 ./TancElf testler/regresyon/derleyici_sonsuz_dongu.tan /tmp/out
-#   # cikis kodu 124 (timeout) = hala kirik. Duzeltildikten sonra: hizli,
-#   # cikis kodu 0, /tmp/out gercek bir binary olmali.
-#
-# KOD DEĞİŞİKLİĞİ YAPILMADI — bu dosya SADECE hatayı kafese alıp
-# tekrarlanabilir kılmak için var (Faz 2-a kapsamı). Asıl düzeltme (hangi
-# blokDerle dalının sonsuz döngüye girdiğini bulup düzeltmek) Faz 2-b.
+#   # DÜZELTMEDEN SONRA (şu an): hızlı, cikis kodu 124 DEĞİL — 1, çıktı
+#   # "BAGLAMA HATASI: etiket bulunamadi: f_sözlük" (sözlük zaten yok,
+#   # Faz 1'den beklenen doğru davranış). cikis kodu 124 görülürse REGRESYON
+#   # var demektir — bug geri gelmiş.
 # ============================================================
 
 kKokKutu = [0]
