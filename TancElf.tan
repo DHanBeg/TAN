@@ -5339,6 +5339,33 @@ son
 
 girdiYolu = arg(1)
 ciktiYolu = arg(2)
+
+# GUVENLIK KAPISI (Faz 0, kaynak-ezme onleme, 2026-09-06): cikti dosyasi
+# girdiyle ayni olamaz VE .tan uzantili olamaz. Kok neden: koleksiyon.tan/
+# secenek.tan/hata.tan (VETA foundation) TancElf ile derlenip cikti yanlislikla
+# kendi .tan yoluna yazilmis, kaynak ELF binary ile ezilmisti (once bu repoya
+# tasinmadan, orijinal tan-veta calismasinda olmus — git blob kaniti: ilk
+# commit'te zaten binary). Bu kapi olmadan ayni hata butun gelecek build'lerde
+# sessizce tekrar edebilir — TancElf hicbir zaman girdi==cikti veya cikti.tan
+# durumunu reddetmiyordu.
+eğer metinEsit(girdiYolu, ciktiYolu) ise
+    yaz("HATA: girdi ve cikti ayni dosya olamaz (kaynagi ezersiniz): " + girdiYolu)
+    sistemDur(1)
+son
+guvenlikN = uzunluk(ciktiYolu)
+eğer guvenlikN >= 4 ise
+    guvenlikSon4 = ""
+    guvenlikI = guvenlikN - 4
+    iken guvenlikI < guvenlikN
+        guvenlikSon4 = metinBirlestir(guvenlikSon4, metinAl(ciktiYolu, guvenlikI))
+        guvenlikI = guvenlikI + 1
+    son
+    eğer metinEsit(guvenlikSon4, ".tan") ise
+        yaz("HATA: cikti dosyasi .tan uzantili olamaz (kaynak dosyasini ezme riski): " + ciktiYolu)
+        sistemDur(1)
+    son
+son
+
 kaynak = oku(girdiYolu)
 tokenler = tokenle(kaynak)
 kaynakDizin = dosyaDizini(girdiYolu)
