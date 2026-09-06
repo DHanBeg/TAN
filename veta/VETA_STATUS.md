@@ -2,7 +2,29 @@
 
 *Tarih: 2026-08-17. Son güncelleme — FAZ 1-5 tamamlandı, Faz 6 devam ediyor.*
 
-## ⚠️ KRİTİK BULGU 3 (2026-08-23) — Kullanıcı tanımlı işlevlerde FLOAT parametre/dönüş BOZUK
+## ✅ KRİTİK BULGU 3 — ÇÖZÜLDÜ (2026-09-06, commit `25e3a08`) — DÜZELTME (2026-09-07)
+
+**Bu bölüm 2026-08-23 tarihli, ARTIK YANLIŞ — silinmedi, tarihsel kayıt
+olarak bırakıldı, ama aşağıdaki "güvenilmez" sonucuna GÜVENME.** Kullanıcı
+tanımlı işlevlerde float parametre/dönüş çıkarımı `govdeDonusTipiCikar`/
+`argumanKesirMi`/`donusIfadesiTipiCikar` (TancElf.tan ~4276-5040) ile
+düzeltildi, kalıcı regresyon testiyle kilitlendi:
+`testler/kesir_tip_cikarimi_testleri.tan` (8/8 GEÇTİ — düz operand, karışık
+tip, 3+ operand zincir, 2-seviye iç içe parantez, karşılaştırma-kesin-tam)
++ `testler/regresyon/kesir_tip_reddet.tan` (INDEKS eleman-tipi sınırının
+DÜRÜST derleme-hatası verdiği vaka, sessiz yanlış "tam" varsayımı YOK).
+Kalan gerçek sınır artık float genelinde DEĞİL, sadece **liste/dizi
+elemanı olarak saklanan float** (`dizi[i] + 1.5` gibi) — bkz. bu dosyanın
+altındaki güncel not. `semantic.tan`'ın aşağıdaki gerekçeyle (satır 26-29)
+float'tan tamamen kaçınma kararı ARTIK YANLIŞ BİR ÖNCÜLE dayanıyor —
+skaler float güvenilir hale geldi, kararın yeniden gözden geçirilmesi
+gerekebilir (ayrı, küçük iş; muhtemel çözüm dizi-içi float DEĞİL, sadece
+skaler normalizasyon).
+
+---
+
+*(Aşağısı orijinal 2026-08-23 metni, tarihsel kayıt olarak korunuyor —
+YUKARIDAKİ DÜZELTMEYİ ESAS AL.)*
 
 TancElf'te bir işlevin FLOAT (ondalık) parametresi veya dönüş değeri
 **sessizce çöp bit deseni** üretiyor — en basit örnek bile bozuk:
@@ -80,7 +102,7 @@ import edilmiyorlar. Listeye yazıldı, kaldırma kararı ayrı bir turda.
 | Regresyon | VERIFIED | prog.tan: 7/7 çıktı birebir |
 | **math kütüphanesi** | **VERIFIED** | 11 fonksiyon, 24 test — hepsi doğru |
 | **string kütüphanesi** | **VERIFIED** | 12 fonksiyon, 20 test (4 derleme) — hepsi doğru |
-| **collection/option/error kütüphaneleri** | **KALDIRILDI (2026-09-06)** | Bu satırlardaki "DOGMALI/compile-verified" iddiası YALANDI — kaynak hiç var olmadı, ilk commit'e (63e6da0) bile 221 baytlık derlenmiş ELF binary olarak girdi, hiçbir zaman derlenmedi/test edilmedi. Disk-geneli arama + tüm git geçmişi sıfır sonuç verdi, kurtarılamaz. 20 gerçek VETA modülünün hiçbiri bunları kullanmıyor (ihtiyaç native dizi + HashTablo.tan ile karşılanıyor) — YAGNI gereği yeniden yazılmadı, kaldırıldı. bkz. commit `ec56717`. |
+| **collection/option/error kütüphaneleri** | **KAYNAK KALDIRILDI (2026-09-06), TESTLER HÂLÂ KIRIK — DÜZELTME (2026-09-07)** | Bu satırlardaki "DOGMALI/compile-verified" iddiası YALANDI — kaynak hiç var olmadı, ilk commit'e (63e6da0) bile 221 baytlık derlenmiş ELF binary olarak girdi, hiçbir zaman derlenmedi/test edilmedi. `ec56717` SADECE 3 kaynak dosyasını sildi (`koleksiyon.tan`/`hata.tan`/`secenek.tan`, hepsi aynı 221-bayt ELF). **"KALDIRILDI" iddiası TAM DEĞİL:** karşılık gelen TEST dosyaları (`veta/tests/test_collection.tan`/`test_koleksiyon.tan`/`test_option.tan`/`test_secenek.tan`/`test_error.tan`/`test_error2.tan`) hiç silinmedi, hâlâ diskte, hâlâ `DERLEME HATASI`/`BAGLAMA HATASI` veriyor (var olmayan modüle/fonksiyona bağlanmaya çalışıyorlar). AYRICA yeni mezar taşı (2026-09-07 denetiminde bulundu): `veta/libraries/foundation/collection/source/test_koleksiyon.tan` (dikkat — `veta/tests/` altındaki AYNI isimli dosyadan FARKLI, bu `ec56717`'nin silmediği 4. bir 221-baytlık ELF, `.tan` uzantılı ama gerçek kaynak değil) — `git rm --cached` ile takipten çıkarıldı (commit `93c8167`), diskte kalıyor, gerçek kaynağı yazma kararı ayrı iş. 20 gerçek VETA modülünün hiçbiri bunları kullanmıyor (ihtiyaç native dizi + HashTablo.tan ile karşılanıyor) — YAGNI gereği yeniden yazılmadı, kaldırılan KISIM için karar doğruydu, sadece testlerin de kaldırılması/güncellenmesi unutulmuş. bkz. commit `ec56717`. |
 | T2 (değişken-dönüş tipi) | **VERIFIED** | govdeDonusTipiCikar + degiskenMetinMi TancElf.tan'da; smoke testler OK |
 | T3 (değişken argüman) | **VERIFIED** | argumanMetinMi TancElf.tan'da; smoke testler OK |
 | **2B dosya G/Ç** | **VERIFIED (2026-08-22)** | dosyaAc/dosyaOkuKonum/dosyaYazKonum/dosyaKapat gerçekten çalışıyor, commit `01a23f9` |
@@ -292,13 +314,22 @@ başlanmadı) + Isolation/2D (tek-thread sınırı hâlâ geçerli).
   core'ları başka dizinde (`veta/libraries/graph`, `veta/libraries/semantic`)
   zaten var ve çalışıyor (yukarı bakın). Bu iki dosya şimdiye kadar hiçbir
   statüde anılmamıştı — unutulmuş taslak. Kaldırma kararı ayrı denetim.
-- **Distributed sistemler:** (event.tan'ın distributed bölümü hariç) başlanmadı.
+- **DÜZELTME (2026-09-07, VETA Faz 0 denetimi):** Aşağıdaki 6 madde (Distributed/
+  ai_memory-observability-optimizer-plugin-autonomy-evolution/Memory/Security/
+  Temporal/2D eşzamanlılık) bu dosyanın KENDİ İÇİNDE, birkaç satır aşağısında
+  (302 ve sonrası) ✅ TAMAMLANDI olarak işaretli — bu üst-özet 2026-08-23
+  oturumunun BAŞLANGIÇ taslağıydı, oturum ilerledikçe altına gerçek sonuçlar
+  eklendi ama bu blok hiç güncellenmedi. Sistematik satır-satır taramada
+  bulundu (grep("TAMAMLANDI") bunu YAKALAMAZ — bu satırlar pozitif eşleşme
+  vermiyor, "başlanmadı" diyor). Aşağıdaki 6 satır DÜZELTİLDİ, silinmedi —
+  hangi gerçek satıra bakılacağı işaretlendi:
+- **Distributed sistemler:** ✅ TAMAMLANDI — bkz. satır ~451 "Distributed core".
 - **Graph, semantic:** Graph yapıları ve algoritmaları (BFS/DFS), semantic kavramlar ve ontolojiler — graph.tan ve semantic.tan; test: test_graph.tan, test_semantic.tan. Not: `kutuphane/Grafik.tan` VAR ama o ASCII çubuk/chart çizim kütüphanesi, graph algoritması DEĞİL — isim benzerliği yanıltıcı, VETA Graph core'una girdi olamaz.
-- **ai_memory, observability, optimizer, plugin, autonomy, evolution:** TAN native struct'lar ve algoritmalar (Faz 7 için ayrılmıştır). Not: `kutuphane/Yapayzeka.tan` VAR ama o dış LLM API çağırma yardımcı fonksiyonu (soruSor), "AI memory" (embedding/vector store) değil.
-- **Memory core (bellek/buffer core, "ham bellek" 2C ile KARIŞTIRILMASIN):** başlanmadı. Not: `kutuphane/AdaptiveCache.tan` (LFU+RLE cache, NEXUS hattı) var ama VETA Memory core'a bağlanmadı, doğrulanmadı.
-- **Security core:** başlanmadı. `kutuphane/sha256.tan`/`tls.tan` dil-seviyesi kripto kütüphanesi, VETA Security core'a bağlanmadı.
-- **Temporal core:** VETA'da başlanmadı. `kutuphane/TemporalEngine.tan` (NEXUS Katman 3, versiyonlama) var ama `LsmDeposu.tan` üzerine kurulu — VETA'nın PageManager hattına bağlı DEĞİL, doğrulanmadı.
-- **2D eşzamanlılık:** hâlâ SELF katmanında YOK (derleyici-seviyesi iş — futex/thread/lock/atomik codegen TancElf.tan'a hiç eklenmedi, eski Go backend'deki `icParcaLat`/DerleElf.go implementasyonu Go-removal'da silindi, self-hosted derleyiciye taşınmadı). Yüksek risk, ayrı dikkatli oturum gerektirir.
+- **ai_memory, observability, optimizer, plugin, autonomy, evolution:** ✅ HEPSİ TAMAMLANDI — bkz. satır ~339/371/402/413/425/438. Not: `kutuphane/Yapayzeka.tan` VAR ama o dış LLM API çağırma yardımcı fonksiyonu (soruSor), "AI memory" (embedding/vector store) değil — VETA core'ları buna bağlı değil, kendi bağımsız implementasyonları.
+- **Memory core (bellek/buffer core, "ham bellek" 2C ile KARIŞTIRILMASIN):** ✅ TAMAMLANDI — bkz. satır ~302. Not: `kutuphane/AdaptiveCache.tan` (LFU+RLE cache, NEXUS hattı) var ama VETA Memory core BUNA bağlı değil, kendi bağımsız implementasyonu.
+- **Security core:** ✅ TAMAMLANDI — bkz. satır ~309. `kutuphane/sha256.tan`/`tls.tan` dil-seviyesi kripto kütüphanesi VETA Security core'un ALTINDA kullanılıyor (şifre hash için), `tls.tan` bağlanmadı.
+- **Temporal core:** ✅ TAMAMLANDI — bkz. satır ~328. `kutuphane/TemporalEngine.tan` (NEXUS Katman 3, versiyonlama) VETA'nın PageManager hattına bağlı DEĞİL — VETA Temporal core kendi bağımsız implementasyonu.
+- **2D eşzamanlılık:** ✅ KISMEN TAMAMLANDI — bkz. satır ~474-528, futex/thread/lock/atomik codegen self-hosted derleyiciye eklendi, 13/13 test kanıtı var. Isolation (tek-thread sınırı) hâlâ geçerli, tam derleyici-seviyesi native eşzamanlılık genel iyileştirmesi ayrı iş.
 - **Memory core** ✅ TAMAMLANDI (2026-08-23) — `veta/libraries/memory/source/memory.tan`.
   LFU tahliye + basit key-value cache (HashTablo üzerine, `kayıt`/`sözlük()`
   KULLANILMADI — bug'lı olduğu bilindiği için). `bellekAc/bellekKoy/bellekAl/
