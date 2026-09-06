@@ -4076,53 +4076,240 @@ işlev islevGovdeSonBul(tokenler, baslangic)
     döndür [i, iceIslevVar]
 son
 
+# terimTipiCikar: [poz,bitis) araliginda TEK bir operandin (terim) tipini
+# belirler, terimin bittigi pozisyonu da dondurur — govdeDonusTipiCikar'in
+# ESKİ "tek token'a bak" mantiginin (METIN literali / SAYIKESIR / SAYI(tam)
+# / AD-çağrı / çıplak AD) isimlendirilmiş, tekrar kullanılabilir hali +
+# YENİ bir 5. dal: parantezli alt-ifade. Dönüş: [tip, sonrakiPoz] — tip
+# "metin"/"kesir"/"tam" (kesin) ya da "reddet" (parantez içinde kesir
+# sinyali var ama tam çözülemiyor — asla "tam" diye TAHMİN ETME).
+# Parantez içinde SIFIR kesir sinyali varsa "tam" döner — bu bir TAHMİN
+# DEĞİL, kanıt yokluğu hükmü (bkz. harfMi/kesirBits, TancElf.tan'ın kendi
+# self-hosting yolunda saf tam sayı parantezli ifadeler — bu dal onları
+# KIRMAMALI, sadece gerçekten kesir sinyali taşıyan parantezleri reddeder).
+işlev terimTipiCikar(tokenler, poz, bitis, n, ad, islevTipKutu)
+    eğer poz >= bitis veya poz >= n ise
+        döndür ["tam", poz]
+    son
+    jt = alan(tokenler[poz], 0)
+    jd = alan(tokenler[poz], 1)
+    eğer jt == "METIN" ise
+        döndür ["metin", poz + 1]
+    son
+    eğer jt == "SAYI" ve karakterVarMi(jd, ".") ise
+        döndür ["kesir", poz + 1]
+    son
+    eğer jt == "SAYI" ise
+        döndür ["tam", poz + 1]
+    son
+    eğer jt == "AD" ise
+        k = poz + 1
+        kt = ""
+        eğer k < bitis ve k < n ise
+            kt = alan(tokenler[k], 0)
+        son
+        eğer kt == "PARAC" ise
+            # çağrı — argüman parantezlerinin GERÇEK kapanışını derinlik
+            # sayarak bul (iç içe çağrı/parantez içerebilir), sonrakiPoz
+            # doğru olsun ki zincirdeki bir sonraki ISLEC doğru yerden
+            # aransın.
+            derinlik = 1
+            m = k + 1
+            iken derinlik > 0 ve m < bitis ve m < n
+                mt = alan(tokenler[m], 0)
+                eğer mt == "PARAC" ise
+                    derinlik = derinlik + 1
+                değilse eğer mt == "PARKAPA" ise
+                    derinlik = derinlik - 1
+                son
+                m = m + 1
+            son
+            eğer yerlesikMetinDonerMi(jd) == 1 ise
+                döndür ["metin", m]
+            son
+            cagriTip = islevTipiAra(islevTipKutu, jd)
+            eğer cagriTip == "metin" veya cagriTip == "kesir" ise
+                döndür [cagriTip, m]
+            son
+            döndür ["tam", m]
+        son
+        # çıplak değişken referansı — sadece BU işlevin KENDİ parametresi
+        # olarak bilinen bir ad ise metin/kesir sayılır (yerel değişken
+        # akış analizi YOK, dürüst sınır, "metin" çözümüyle birebir aynı).
+        anahtarDeneme = metinBirlestir(ad, metinBirlestir("/", jd))
+        paramTip = parametreTipiAra(islevTipKutu, anahtarDeneme)
+        eğer paramTip == "metin" veya paramTip == "kesir" ise
+            döndür [paramTip, poz + 1]
+        son
+        döndür ["tam", poz + 1]
+    son
+    eğer jt == "PARAC" ise
+        # parantezli alt-ifade — ÖNCE ÖZYİNELİ TAM ÇÖZMEYİ DENE: içerik
+        # SAF bir "terim [ISLEC terim]*" zinciriyse (iç içe parantez dahil,
+        # ör. "(x+1.0)*2.0"), donusIfadesiTipiCikar zinciri baştan sona
+        # tüketir ve kapanan PARKAPA'ya TAM ULAŞIR — bu durumda gerçek tip
+        # (metin/kesir/tam) döner, TAHMİN değil, çözüm. İçerik karşılaştırma
+        # (>=,==,...) ya da mantıksal (ve/veya/değil) gibi zincirin
+        # ANLAMADIĞI bir şey barındırıyorsa (harfMi gibi — bkz. TancElf.tan
+        # satır 47), özyineli çözüm PARKAPA'dan ÖNCE durur — bu durumda SAF
+        # SİNYAL TARAMASINA düşülür (kapanışa kadar SAYIKESIR/kesir-çağrı/
+        # kesir-parametre var mı). Sinyal yoksa "tam" (kanıt yokluğu hükmü
+        # — harfMi/kesirBits'i KIRMAZ), sinyal varsa "reddet" (yanlış-
+        # pozitif sinyal GÜVENLİDİR, en kötü ihtimalle gereksiz "reddet").
+        ozyinelSonuc = donusIfadesiTipiCikar(tokenler, poz + 1, bitis, n, ad, islevTipKutu)
+        ozTip = ozyinelSonuc[0]
+        ozPoz = ozyinelSonuc[1]
+        eğer ozTip != "reddet" ve ozPoz < bitis ve ozPoz < n ve alan(tokenler[ozPoz], 0) == "PARKAPA" ise
+            döndür [ozTip, ozPoz + 1]
+        son
+        # özyineli çözüm PARKAPA'ya tam ulaşmadı (ya da doğrudan reddetti) —
+        # güvenli tarafa düş: kapanan PARKAPA'yı derinlik sayarak bul,
+        # aralığı SİNYAL için baştan tara.
+        derinlik = 1
+        m = poz + 1
+        sinyalVar = 0
+        iken derinlik > 0 ve m < bitis ve m < n
+            mt = alan(tokenler[m], 0)
+            md = alan(tokenler[m], 1)
+            eğer mt == "PARAC" ise
+                derinlik = derinlik + 1
+            değilse eğer mt == "PARKAPA" ise
+                derinlik = derinlik - 1
+            değilse eğer mt == "SAYI" ve karakterVarMi(md, ".") ise
+                sinyalVar = 1
+            değilse eğer mt == "AD" ise
+                mk = m + 1
+                mkt = ""
+                eğer mk < bitis ve mk < n ise
+                    mkt = alan(tokenler[mk], 0)
+                son
+                eğer mkt == "PARAC" ise
+                    eğer islevTipiAra(islevTipKutu, md) == "kesir" ise
+                        sinyalVar = 1
+                    son
+                değilse
+                    anahtarDeneme2 = metinBirlestir(ad, metinBirlestir("/", md))
+                    eğer parametreTipiAra(islevTipKutu, anahtarDeneme2) == "kesir" ise
+                        sinyalVar = 1
+                    son
+                son
+            son
+            m = m + 1
+        son
+        eğer sinyalVar == 1 ise
+            döndür ["reddet", m]
+        son
+        döndür ["tam", m]
+    son
+    döndür ["tam", poz + 1]
+son
+
+# donusIfadesiTipiCikar: terimTipiCikar ile TEK bir "terim [ISLEC terim]*"
+# zincirini (a+b+c+d gibi, parantezsiz düz zincir — terimlerden biri
+# kendisi de parantezli bir alt-zincir OLABİLİR, terimTipiCikar'ın PARAC
+# dalı özyineli olarak BU fonksiyonu çağırıyor) baştan sona çözer — öncelik
+# metin > kesir > tam (IKILI'nin, satır ~4790 civarı, kullandığı AYNI
+# terfi kuralı). Herhangi bir terim "reddet" ise TÜM zincir reddedilir
+# (kısmi tahmin YOK). Dönüş: [tip, sonrakiPoz] — sonrakiPoz, ÇAĞIRANIN
+# (özellikle terimTipiCikar'ın PARAC dalının) zincirin GERÇEKTEN NEREDE
+# durduğunu (temiz mi yoksa tanınmayan bir token'da mı) anlaması için.
+işlev donusIfadesiTipiCikar(tokenler, poz, bitis, n, ad, islevTipKutu)
+    sonuc = terimTipiCikar(tokenler, poz, bitis, n, ad, islevTipKutu)
+    tip = sonuc[0]
+    p = sonuc[1]
+    eğer tip == "reddet" ise
+        döndür ["reddet", p]
+    son
+    iken doğru
+        eğer p >= bitis veya p >= n ise
+            dur
+        son
+        pt = alan(tokenler[p], 0)
+        pd = alan(tokenler[p], 1)
+        # KARŞILAŞTIRMA/MANTIK operatörü (>=,<=,==,!=,>,<,ve,veya) burada
+        # görülürse sonuç KESİN "tam"dır — comisd/setcc yolu operand tipi
+        # ne olursa olsun HER ZAMAN 0/1 tam sayı üretir (ifadeBantYaz IKILI
+        # dalı, satır ~4870 civarı, bunu zaten böyle üretiyor). Bu bir
+        # TAHMİN DEĞİL — dilin kendi karşılaştırma semantiğinin doğrudan
+        # sonucu. Önceki terimin tipi (kesir/metin olabilir, ör. "x>=1.5")
+        # ÖNEMSİZ hale gelir, ZORLA "tam"a çevrilir; sağ taraf hiç
+        # ayrıştırılmaz (typing için gerekmiyor, karşılaştırma sonucu
+        # zaten sabit).
+        eğer pt == "ISLEC" ve (pd == ">" veya pd == "<" veya pd == ">=" veya pd == "<=" veya pd == "==" veya pd == "!=") ise
+            döndür ["tam", p]
+        son
+        eğer pt == "ANAHTAR" ve (pd == "ve" veya pd == "veya") ise
+            döndür ["tam", p]
+        son
+        devamVarMi = 0
+        eğer pt == "ISLEC" ve (pd == "+" veya pd == "-" veya pd == "*" veya pd == "/" veya pd == "%") ise
+            devamVarMi = 1
+        son
+        eğer devamVarMi == 0 ise
+            dur
+        son
+        sonuc2 = terimTipiCikar(tokenler, p + 1, bitis, n, ad, islevTipKutu)
+        tip2 = sonuc2[0]
+        p2 = sonuc2[1]
+        eğer tip2 == "reddet" ise
+            döndür ["reddet", p2]
+        son
+        p = p2
+        eğer tip == "metin" veya tip2 == "metin" ise
+            tip = "metin"
+        değilse eğer tip == "kesir" veya tip2 == "kesir" ise
+            tip = "kesir"
+        değilse
+            tip = "tam"
+        son
+    son
+    döndür [tip, p]
+son
+
 # govdeDonusTipiCikar: [bas,bitis) aralığındaki TÜM "döndür" deyimlerini
-# tara. Hepsi metin-literali ya da bilinen-metin-döndüren-çağrı ise
-# "metin", en az bir döndür varsa VE hepsi öyleyse. Aksi HER durumda
-# (döndür yok, karışık, tanınmayan desen) "tam" — güvenli varsayılan.
-işlev govdeDonusTipiCikar(tokenler, bas, bitis, islevTipKutu)
+# tara. Hepsi metin ise "metin", hepsi kesir ise "kesir" (en az bir döndür
+# varsa VE hepsi öyleyse — öncelik metin > kesir, IKILI ile aynı). Herhangi
+# bir döndür ifadesi "reddet" ise (parantezli + kesir sinyali + çözülemez)
+# DERLEME HATASI — sessiz "tam" tahmini YOK. Aksi HER durumda (döndür yok,
+# karışık, tanınmayan desen, kesir sinyali OLMAYAN parantez) "tam" — bu
+# artık bir tahmin değil, kanıt yokluğunda verilen kesin hüküm.
+işlev govdeDonusTipiCikar(ad, tokenler, bas, bitis, islevTipKutu)
     n = uzunluk(tokenler)
     i = bas
     doluMu = 0
     hepsiMetinMi = 1
+    hepsiKesirMi = 1
+    reddedildi = 0
     iken i < bitis ve i < n
         t = alan(tokenler[i], 0)
         d = alan(tokenler[i], 1)
         eğer t == "ANAHTAR" ve d == "döndür" ise
             doluMu = 1
-            j = i + 1
-            eğer j < bitis ve j < n ise
-                jt = alan(tokenler[j], 0)
-                jd = alan(tokenler[j], 1)
-                eğer jt == "METIN" ise
-                    # metin literali — hepsiMetinMi zaten 1, dokunma
-                    x = 0
-                değilse eğer jt == "AD" ise
-                    k = j + 1
-                    kt = ""
-                    eğer k < bitis ve k < n ise
-                        kt = alan(tokenler[k], 0)
-                    son
-                    eğer kt == "PARAC" ise
-                        eğer yerlesikMetinDonerMi(jd) == 1 ise
-                            x = 0
-                        değilse eğer islevTipiAra(islevTipKutu, jd) == "metin" ise
-                            x = 0
-                        değilse
-                            hepsiMetinMi = 0
-                        son
-                    değilse
-                        hepsiMetinMi = 0
-                    son
-                değilse
-                    hepsiMetinMi = 0
-                son
+            ifadeSonuc = donusIfadesiTipiCikar(tokenler, i + 1, bitis, n, ad, islevTipKutu)
+            ifadeTip = ifadeSonuc[0]
+            eğer ifadeTip == "reddet" ise
+                reddedildi = 1
+            değilse eğer ifadeTip == "metin" ise
+                hepsiKesirMi = 0
+            değilse eğer ifadeTip == "kesir" ise
+                hepsiMetinMi = 0
+            değilse
+                hepsiMetinMi = 0
+                hepsiKesirMi = 0
             son
         son
         i = i + 1
     son
+    eğer reddedildi == 1 ise
+        adMetin = metinBirlestir("", ad)
+        yaz("DERLEME HATASI: '" + adMetin + "' isleminin donus tipi cikarilamadi (parantezli donus ifadesinde kesir sinyali var ama tam cozulemiyor) - ifadeyi basitlestirin ya da ara degiskene atayip ayri satirda dondurun")
+        sistemDur(1)
+    son
     eğer doluMu == 1 ve hepsiMetinMi == 1 ise
         döndür "metin"
+    son
+    eğer doluMu == 1 ve hepsiKesirMi == 1 ise
+        döndür "kesir"
     son
     döndür "tam"
 son
@@ -4154,7 +4341,7 @@ işlev islevDonusTipleriBirGecis(tokenler, islevTipKutu)
             govdeSonu = sonuclar[0]
             iceIslevVar = sonuclar[1]
             eğer iceIslevVar == 0 ise
-                yeniTip = govdeDonusTipiCikar(tokenler, i, govdeSonu - 1, islevTipKutu)
+                yeniTip = govdeDonusTipiCikar(ad, tokenler, i, govdeSonu - 1, islevTipKutu)
                 eskiTip = islevTipiAra(islevTipKutu, ad)
                 eğer değil metinEsit(eskiTip, yeniTip) ise
                     degisti = 1
@@ -4347,6 +4534,24 @@ işlev argumanMetinMi(tokenler, argBas, argBitis, islevTipKutu)
     döndür 0
 son
 
+# argumanKesirMi: argumanMetinMi ile AYNI kısıtlı felsefe, "kesir" (float)
+# için (Faz B, TAN Float). Tek SAYIKESIR literali ya da TEK BAŞINA bilinen
+# bir kesir-döndüren KULLANICI işlevinin çağrısı tanınır. Karmaşık ifadeler
+# İZLENMEZ — güvenli varsayılan "tam" kalır (yanlış pozitif ASLA).
+işlev argumanKesirMi(tokenler, argBas, argBitis, islevTipKutu)
+    uzunlukTok = argBitis - argBas
+    eğer uzunlukTok == 1 ve alan(tokenler[argBas], 0) == "SAYI" ve karakterVarMi(alan(tokenler[argBas], 1), ".") ise
+        döndür 1
+    son
+    eğer uzunlukTok >= 3 ve alan(tokenler[argBas], 0) == "AD" ve alan(tokenler[argBas + 1], 0) == "PARAC" ve alan(tokenler[argBitis - 1], 0) == "PARKAPA" ise
+        cagrilanAd = alan(tokenler[argBas], 1)
+        eğer islevTipiAra(islevTipKutu, cagrilanAd) == "kesir" ise
+            döndür 1
+        son
+    son
+    döndür 0
+son
+
 # parametreTipleriniTara: tüm kaynağı TEK geçişte tarar; her CAGRI (AD
 # hemen ardından PARAC) görüldüğünde AD bilinen bir KULLANICI işleviyse
 # argümanları sınırlandırıp metin olanları islevTipKutu[2]/[3]'e yazar.
@@ -4373,6 +4578,12 @@ işlev parametreTipleriniTara(tokenler, islevTipKutu)
                     eğer argIndex < uzunluk(parametreler) ve argumanMetinMi(tokenler, argBas, argBitis, islevTipKutu) == 1 ise
                         anahtar = metinBirlestir(ad, metinBirlestir("/", parametreler[argIndex]))
                         z = parametreTipiKaydet(islevTipKutu, anahtar, "metin")
+                    değilse eğer argIndex < uzunluk(parametreler) ve argumanKesirMi(tokenler, argBas, argBitis, islevTipKutu) == 1 ise
+                        # Faz B (TAN Float): kesir argüman geçilen parametre
+                        # "kesir" olarak kaydedilir — metin ile AYNI öncelik
+                        # yapısı (metin ÖNCE kontrol edilir, çakışmaz).
+                        anahtar = metinBirlestir(ad, metinBirlestir("/", parametreler[argIndex]))
+                        z = parametreTipiKaydet(islevTipKutu, anahtar, "kesir")
                     son
                     argIndex = argIndex + 1
                     k = k + 2
@@ -5419,6 +5630,13 @@ sayacKutu = [0]
 # ikili SEGFAULT verdi, bu deseme geri dönülünce düzeldi).
 satirHaritasi = [tamponOlustur(), [0]]
 islevTipKutu = [[], [], [], [], [], satirHaritasi]
+# Faz B (TAN Float): govdeDonusTipiCikar artik "döndür x" cıplak
+# değişken durumunda parametreTipiAra'ya bakıyor (bare-kesir tespiti) —
+# bu yüzden parametreTipleriniTara'nın islevDonusTipleriTara'dan ÖNCE de
+# bir kez çalışması gerekiyor (parametre tipleri erken bilinsin). Mevcut
+# SONRAKİ çağrı (parametreTipleriniTara'nın kendi çağrı-sonucu-tipi
+# bağımlılığı için, dönüş tipleri STABİL olduktan sonra) KORUNUYOR.
+z = parametreTipleriniTara(tokenler, islevTipKutu)
 z = islevDonusTipleriTara(tokenler, islevTipKutu)
 z = parametreTipleriniTara(tokenler, islevTipKutu)
 z = ulasilabilirIslevleriTara(tokenler, islevTipKutu)
