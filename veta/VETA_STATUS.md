@@ -80,9 +80,7 @@ Storage/Query/Event'in yaptığı gibi.
 | Regresyon | VERIFIED | prog.tan: 7/7 çıktı birebir |
 | **math kütüphanesi** | **VERIFIED** | 11 fonksiyon, 24 test — hepsi doğru |
 | **string kütüphanesi** | **VERIFIED** | 12 fonksiyon, 20 test (4 derleme) — hepsi doğru |
-| **collection kütüphanesi** | **DOGMALI** | 7 fonksiyon, compile-verified (qemu throttle smoke test) |
-| **option/result kütüphanesi** | **DOGMALI** | 4 fonksiyon, compile-verified (qemu throttle smoke test) |
-| **error kütüphanesi** | **DOGMALI** | 1 fonksiyon, compile-verified (qemu throttle smoke test) |
+| **collection/option/error kütüphaneleri** | **KALDIRILDI (2026-09-06)** | Bu satırlardaki "DOGMALI/compile-verified" iddiası YALANDI — kaynak hiç var olmadı, ilk commit'e (63e6da0) bile 221 baytlık derlenmiş ELF binary olarak girdi, hiçbir zaman derlenmedi/test edilmedi. Disk-geneli arama + tüm git geçmişi sıfır sonuç verdi, kurtarılamaz. 20 gerçek VETA modülünün hiçbiri bunları kullanmıyor (ihtiyaç native dizi + HashTablo.tan ile karşılanıyor) — YAGNI gereği yeniden yazılmadı, kaldırıldı. bkz. commit `ec56717`. |
 | T2 (değişken-dönüş tipi) | **VERIFIED** | govdeDonusTipiCikar + degiskenMetinMi TancElf.tan'da; smoke testler OK |
 | T3 (değişken argüman) | **VERIFIED** | argumanMetinMi TancElf.tan'da; smoke testler OK |
 | **2B dosya G/Ç** | **VERIFIED (2026-08-22)** | dosyaAc/dosyaOkuKonum/dosyaYazKonum/dosyaKapat gerçekten çalışıyor, commit `01a23f9` |
@@ -107,10 +105,16 @@ Storage/Query/Event'in yaptığı gibi.
 - T3: `argumanMetinMi` — TancElf.tan'da zaten uygulandı
 - **Kural:** Bu değişiklikler bootstrap yeniden çalıştırmayı gerektirmedi; mevcut TancElf binary ile kanıtlandı
 
-### Faz 3 — Genişletmiş Foundation (tamam, smoke testlerle)
-- collection: 7 fonksiyon, compile-verified — test: test_koleksiyon.tan
-- option/result: 4 fonksiyon, compile-verified — test: test_option.tan, test_secenek.tan
-- error: 1 fonksiyon, compile-verified — test: test_error.tan, test_error2.tan
+### Faz 3 — Genişletmiş Foundation (KISMEN YALAN ÇIKTI — 2026-09-06 düzeltmesi)
+- **collection/option/error: bu satırların "compile-verified" iddiası tamamen yalandı.**
+  koleksiyon.tan/secenek.tan/hata.tan hiçbir zaman gerçek TAN kaynağı olarak
+  var olmadı — ilk commit'e (63e6da0) bile 221 baytlık, üç dosyada da
+  byte-birebir aynı, derlenmiş ELF binary olarak girdiler. Hiç derlenmedi,
+  hiç test edilmedi. Disk-geneli arama + tüm git geçmişi (tüm branch/tag)
+  kaynağın hiçbir yerde bulunamadığını doğruladı — kurtarılamaz, hiç
+  doğmamış modül. 2026-09-06'da kaldırıldı (commit `ec56717`), YAGNI
+  gereği yeniden yazılmadı — 20 gerçek VETA modülünün hiçbiri bunları
+  kullanmıyor, ihtiyaç native dizi + HashTablo.tan ile karşılanıyor.
 - math kesir/ekler: mevcut, smoke test yapıldı
 
 ### Faz 4 — 2B+2D Dosya G/Ç ve Eşzamanlılık (tamam, throttle engellidir)
