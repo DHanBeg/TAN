@@ -1,0 +1,100 @@
+# kesir_tip_cikarimi_testleri.tan — Faz B (TAN Float, commit 25e3a08)
+# tip çıkarımının KALICI regresyonu.
+#
+# NEDEN VAR: 2026-09-06'da topla(1.5,2.3)/carp(2.5,4.0) T1-T4 olarak
+# GEÇİCİ probe script'leriyle doğrulanmıştı (float_fix_probe.tan) —
+# probe'lar çalıştırıldı, sonuç gözlemlendi, SİLİNDİ. Kanıt vardı, kaydı
+# yoktu — bu dosya o kanıtın KAYDIDIR: govdeDonusTipiCikar/argumanKesirMi/
+# donusIfadesiTipiCikar/terimTipiCikar (TancElf.tan ~4276-5040) gelecekte
+# bir refactor ile bozulursa burada YAKALANIR (test yoksa kırılma sessiz
+# kalır — collection/option/error yalan-etiketinin ters yüzü: orada kanıt
+# yokken "var" deniyordu, burada kanıt vardı ama kaydı kayboluyordu).
+#
+# KAPSAM DIŞI (ayrı regresyon dosyası, testler/regresyon/kesir_tip_reddet.tan):
+# INDEKS eleman-tipi izlenmediği için "dizi[0]+1.5" DERLEME HATASI vermeli
+# — başarısız derleme beklenen bir vakayı bu dosyaya (başarılı derleme
+# bekleyen *_testleri.tan glob'u) KOYAMAYIZ, tek bir hata TÜM
+# TestAraclar.sh koşusunu (set -e) durdurur.
+
+içe al "kutuphane/test.tan"
+
+gecti = 0
+toplam = 0
+
+# --- T1: düz operand, float parametre + float dönüş (2 operand) ---
+işlev toplaK(a, b)
+    döndür a + b
+son
+
+işlev carpK(a, b)
+    döndür a * b
+son
+
+sonuc1 = metin(toplaK(1.5, 2.3))
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("3.8", sonuc1, "toplaK(1.5,2.3): duz kesir operand toplami")
+
+sonuc2 = metin(carpK(2.5, 4.0))
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("10", sonuc2, "carpK(2.5,4.0): duz kesir operand carpimi (kesirli kisim 0 -> noktasiz)")
+
+# --- T2: karışık operand (tam + kesir tek zincirde, 2 operand) ---
+işlev karisikK(x)
+    döndür x + 1.5
+son
+
+sonuc3 = metin(karisikK(2.0))
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("3.5", sonuc3, "karisikK(2.0): x+1.5 karisik tam/kesir operand")
+
+# --- T3: parantezli ifade, özyineli TEK-seviye iç içe parantez ---
+işlev parantezliK(x)
+    döndür (x + 1.0) * 2.0
+son
+
+sonuc4 = metin(parantezliK(3.0))
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("8", sonuc4, "parantezliK(3.0): (x+1.0)*2.0 tek-seviye ic ice parantez ozyineli cozum")
+
+# --- Karşılaştırma operatörü KESİN "tam" dönüyor (comisd/setcc her zaman 0/1) ---
+işlev karsilastirK(x)
+    döndür x >= 1.5
+son
+
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(1, karsilastirK(2.0), "karsilastirK: >= KESIN tam (0/1) donuyor, kesir DEGIL")
+
+# ============================================================
+# AŞAĞISI: kanıt borcu kapatma denemesi (Demir'in Faz 0 raporunda tespit
+# edilen iki açık uç). Bu testler İLK YAZILDIĞINDA KIRMIZI ÇIKARSA bu,
+# ilgili dalın gerçekten açık olduğunun KANITIDIR — "çözüldü" iddiası
+# geri çekilir, teşhise dönülür. Yeşil çıkarsa dal kapanır.
+# ============================================================
+
+# --- 3+ operand zincir (düz, aynı önceliğe sahip degil - + ve * karisik) ---
+işlev uclu1K(a, b, c)
+    döndür a + b + c
+son
+
+sonuc5 = metin(uclu1K(1.0, 2.5, 0.5))
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("4", sonuc5, "uclu1K(1.0,2.5,0.5): 3 operandli duz zincir (a+b+c)")
+
+işlev uclu2K(a, b, c)
+    döndür a + b * c
+son
+
+sonuc6 = metin(uclu2K(1.0, 2.0, 1.5))
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("4", sonuc6, "uclu2K(1.0,2.0,1.5): 3 operandli karisik-oncelikli zincir (a+b*c)")
+
+# --- 2-seviye iç içe parantez ---
+işlev derinParantezK(x)
+    döndür ((x + 1.0) * 2.0) + 3.0
+son
+
+sonuc7 = metin(derinParantezK(3.0))
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("11", sonuc7, "derinParantezK(3.0): ((x+1.0)*2.0)+3.0 iki-seviye ic ice parantez")
+
+d = testSonuc(gecti, toplam)

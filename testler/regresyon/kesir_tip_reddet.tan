@@ -1,0 +1,30 @@
+# kesir_tip_reddet.tan — Faz B (TAN Float, commit 25e3a08) "reddet" dalının
+# KALICI regresyonu. testler/kesir_tip_cikarimi_testleri.tan'ın kapsam-dışı
+# bıraktığı vaka: bu dosya BAŞARILI DERLENMEMESİ gereken tek bir işlev
+# içerir, bu yüzden *_testleri.tan glob'una (TestAraclar.sh, set -e) GİREMEZ
+# — girse tüm test koşusunu durdurur. Elle/ayrı çalıştır:
+#
+#   ./TancElf testler/regresyon/kesir_tip_reddet.tan /tmp/out
+#
+# BEKLENEN: çıkış kodu != 0, çıktıda "DERLEME HATASI" alt dizesi (INDEKS
+# eleman-tipi hiçbir katmanda izlenmiyor — TancElf.tan satır ~4791-4805,
+# hedef metin değilse koşulsuz "tam" varsayıyor — bu yüzden "dizi[0]+1.5"
+# içeren parantezli ifade kesir sinyali görüp özyineli TAM çözülemiyor,
+# derleyici SESSİZCE "tam" varsaymak YERİNE derleme hatası veriyor; bkz.
+# 25e3a08 commit mesajı T4). Bu dosya AŞAĞIDAKİ İKİ ŞEYDEN BİRİNİ doğrular:
+#   (a) hâlâ reddediyor (beklenen, mimari sınır hâlâ duruyor — VETA'nın
+#       float-depolama tavanı sorusu hâlâ açık, INDEKS eleman-tipini
+#       izlemeden çözülemez)
+#   (b) ileride biri INDEKS eleman-tipini gerçekten izlerse bu dosya
+#       BAŞARIYLA DERLENMEYE başlar — o an bu dosyayı normal
+#       *_testleri.tan glob'una TAŞI (artık reddetme testi değil, kabul
+#       testi olur) ve bu yorumu güncelle.
+#
+# Otomatik CI/script entegrasyonu YOK (regresyon/ dizini kasıtlı olarak
+# glob dışı, derleyici_sonsuz_dongu.tan ile AYNI konvansiyon).
+
+işlev disaridanKesirTopla(dizi)
+    döndür (dizi[0] + 1.5) * 2.0
+son
+
+yaz(disaridanKesirTopla([1.0, 2.0, 3.0]))
