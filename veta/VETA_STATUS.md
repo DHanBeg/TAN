@@ -55,21 +55,21 @@ skorlama kısımları vb.) bu sınırla kısıtlı kalacak.
    (mevcut + gelecek) kontrol edilmeli** — opencode'un ürettiği kodda
    özellikle risk yüksek (weak model uzun satırları sarmalayabilir).
 
-## ⚠️ KRİTİK BULGU (2026-08-23) — `kayıt`(struct)/`sözlük()` kullanan dosyalar KIRIK
+## `sözlük()`/`kayıt` durumu — DÜZELTME (2026-09-06, Faz 1)
 
-`kutuphane/AdaptiveCache.tan`, `LsmDeposu.tan`, `BAgaci.tan`, `TemporalEngine.tan`
-— hepsi `kayıt` (struct) tipi ve/veya `sözlük()` builtin'i kullanıyor. Bunlar
-NEXUS/eski Go-tabanlı yorumlayıcı (`./tan`) için yazılmış, self-hosted native
-derleyici (`TancElf`) için DEĞİL. Doğrulandı: `TancElf` bu dosyaları HATASIZ
-derliyor (BAGLAMA/DERLEME HATASI yok) ama üretilen binary **çalışma zamanında
-hiçbir şey yapmıyor** — sessiz miscompilation (test: basit `ob=onbellekAc(10);
-onbellekKoy(...); yaz(onbellekAl(...))` sıfır çıktı verdi, exit 0). Yani
-`kayıt`/`sözlük()` TancElf'te görünüşte kabul ediliyor ama gerçek kod
-üretmiyor — TEHLİKELİ bir sessiz derleyici hatası, ayrı bir iş olarak
-raporlanmalı/düzeltilmeli. **VETA bu 4 dosyayı building-block olarak
-KULLANMAMALI** — kanıtlı çalışan primitifler (dizi/ekle/uzunluk/indeks +
-`HashTablo.tan` deseni, `kayıt`/`sözlük()` OLMADAN) kullanılmalı, tıpkı
-Storage/Query/Event'in yaptığı gibi.
+Yukarıdaki eski bulgu ("TancElf hatasız derliyor ama sessizce çalışmıyor")
+**yanıltıcıydı** — eski, silinmiş Go-tabanlı arka uca (`DerleElf.go`) aitti.
+İzole testle doğrulandı: self-hosted `TancElf.tan`'da `sözlük()` (ya da
+`kayıt`) hiç var olmadı — ne keyword listesinde ne CAGRI dispatch'inde
+(`grep sözlük TancElf.tan` → sıfır eşleşme). Çağrı denenince BUGÜN zaten
+herhangi bir bilinmeyen isimle birebir aynı temiz reddi veriyor:
+`BAGLAMA HATASI: etiket bulunamadi: f_sözlük` — sessiz no-op DEĞİL. Resmî
+hash primitifi `kutuphane/HashTablo.tan`.
+
+**Mezar taşı adayı (ayrı denetim, ŞİMDİ dokunulmadı):** `kutuphane/AdaptiveCache.tan`,
+`BAgaci.tan`, `Heap.tan`, `LsmDeposu.tan`, `TemporalEngine.tan` — hâlâ
+`sözlük()` çağırıyorlar (dolayısıyla derlenmiyorlar), hiçbir VETA modülünce
+import edilmiyorlar. Listeye yazıldı, kaldırma kararı ayrı bir turda.
 
 ## Özet
 
