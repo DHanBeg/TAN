@@ -243,19 +243,21 @@ import edilmiyorlar. Listeye yazıldı, kaldırma kararı ayrı bir turda.
   kendi sayfasında (`key + karakter(1) + değer`), arama **linear tarama**
   (index YOK — her `sorguSec` tüm veri sayfalarını gezer, küçük/orta
   ölçek için yeterli, büyük ölçekte O(n) maliyeti var, ayrı iş).
-- **Doğrulama:** `veta/tests/test_query.tan` — 5/5 GEÇTİ (ekle+seç, iki
-  farklı key'in karışmaması, olmayan key → boş metin). WSL native ortamda
-  `TancElf` ile derlendi ve gerçekten çalıştırıldı (çıktı: "TUM TESTLER
-  GECTI"). Kendi kendine barındırma (self-hosting) sabit noktası
-  (`TancElf`/`gen1`/`gen2`/`gen3`) bu turda DOKUNULMADI, `gen1==gen2==gen3`
-  doğrulandı (değişmedi).
+- **DÜZELTME (2026-09-06):** Bu bölüm bayattı — `sorguGuncelle` (UPDATE,
+  satır 204) ve `sorguSil` (DELETE, satır 228) ARADAN GEÇEN BİR TURDA
+  eklenmiş, doküman güncellenmemişti. Aşağıdaki "Kalan: UPDATE/DELETE yok"
+  satırı YANLIŞTI, silindi. **Doğrulama (taze, 2026-09-06):**
+  `veta/tests/test_query.tan` — **13/13 GEÇTİ** (ekle/seç/güncelle/sil,
+  iki farklı key'in karışmaması, olmayan key → boş metin). WSL native
+  ortamda `TancElf` ile derlendi ve gerçekten çalıştırıldı ("TUM TESTLER
+  GECTI").
 - **Dürüst sınır:** Transaction (Islem.tan) kullanılıyor ama Isolation
   yok (tek-thread), fsync yok (2B'nin sınırı miras). Index/hash tablosu
   entegrasyonu (kutuphane/HashTablo.tan, 2A) YOK — linear tarama bilinçli
   bir basitleştirme, sonraki iş.
-- **Kalan:** UPDATE/DELETE yok (sadece ekle/seç), index'leme yok, WHERE/
-  SQL sözdizimi yok — bunlar bilinçli olarak bu minimal dilimin dışında
-  bırakıldı.
+- **Kalan:** index'leme yok, WHERE/SQL sözdizimi yok — bunlar bilinçli
+  olarak bu minimal dilimin dışında bırakıldı. (UPDATE/DELETE artık VAR,
+  yukarı bakın.)
 
 #### Transaction (İşlem) — Storage seviyesinde ÇÖZÜLDÜ (`kutuphane/Islem.tan`)
 - Eski `transaction.tan`/`transaction_detail.tan` (tasarım notu, sıfır kod)
@@ -284,6 +286,12 @@ başlanmadı) + Isolation/2D (tek-thread sınırı hâlâ geçerli).
   kritik test edildi ve ÇALIŞTIĞI doğrulandı (TAN referans semantiği bu
   durumda mutable). `distributed sistem` (spread_event/NodeId) kısmı bu
   turda YAZILMADI — tek-node polling event bus bitti, distributed kısmı ayrı iş.
+- **MEZAR TAŞI NOTU (2026-09-06):** `veta/libraries/concurrency/source/graph.tan`
+  ve `semantic.tan` — bu ikisi %100 yorum satırı, sıfır `işlev` gövdesi.
+  Concurrency ile alakasız (eski tasarım/ontology notu), gerçek Graph/Semantic
+  core'ları başka dizinde (`veta/libraries/graph`, `veta/libraries/semantic`)
+  zaten var ve çalışıyor (yukarı bakın). Bu iki dosya şimdiye kadar hiçbir
+  statüde anılmamıştı — unutulmuş taslak. Kaldırma kararı ayrı denetim.
 - **Distributed sistemler:** (event.tan'ın distributed bölümü hariç) başlanmadı.
 - **Graph, semantic:** Graph yapıları ve algoritmaları (BFS/DFS), semantic kavramlar ve ontolojiler — graph.tan ve semantic.tan; test: test_graph.tan, test_semantic.tan. Not: `kutuphane/Grafik.tan` VAR ama o ASCII çubuk/chart çizim kütüphanesi, graph algoritması DEĞİL — isim benzerliği yanıltıcı, VETA Graph core'una girdi olamaz.
 - **ai_memory, observability, optimizer, plugin, autonomy, evolution:** TAN native struct'lar ve algoritmalar (Faz 7 için ayrılmıştır). Not: `kutuphane/Yapayzeka.tan` VAR ama o dış LLM API çağırma yardımcı fonksiyonu (soruSor), "AI memory" (embedding/vector store) değil.
@@ -298,14 +306,18 @@ başlanmadı) + Isolation/2D (tek-thread sınırı hâlâ geçerli).
   KAPSAM DIŞI (dürüst, TAN'da o API yok). Test: `veta/tests/test_memory.tan`
   — 11/11 GEÇTİ (WSL native), LFU tahliyenin doğru anahtarı seçtiği
   doğrulandı.
-- **Security core** ✅ TAMAMLANDI (2026-08-23) — `veta/libraries/security/source/security.tan`.
+- **Security core** ✅ TAMAMLANDI (2026-08-23), **rol katmanı SONRADAN eklendi
+  (2026-09-06'da fark edildi)** — `veta/libraries/security/source/security.tan`.
   `guvenlikAc/guvenlikKullaniciEkle/guvenlikDogrula/guvenlikIzinVer/
   guvenlikYetkiliMi/guvenlikDenetimKaydet/guvenlikDenetimDogrula/
-  guvenlikDenetimSayisi`. sha256 şifre hash + düz kullanıcı->izin
-  (RBAC'ın rol katmanı YOK, v1 basitleştirmesi, dürüst) + **hash-chain
-  audit log (tamper-evident)** — kayıt sonradan değiştirilirse
+  guvenlikDenetimSayisi`. sha256 şifre hash + düz kullanıcı->izin +
+  **hash-chain audit log (tamper-evident)** — kayıt sonradan değiştirilirse
   `guvenlikDenetimDogrula` bunu yakalıyor, gerçekten test edildi.
-  Test: `veta/tests/test_security.tan` — 9/9 GEÇTİ (WSL native), kurcalama
+  **DÜZELTME: aşağıdaki "RBAC'ın rol katmanı YOK" iddiası YANLIŞTI** —
+  `guvenlikRolVer` (satır 126), `guvenlikRolIzinVer` (157),
+  `guvenlikRolYetkiliMi` (166) tam rol katmanı olarak mevcut, doküman
+  eski hâliyle bırakılmıştı. **Doğrulama (taze, 2026-09-06):**
+  `veta/tests/test_security.tan` — **19/19 GEÇTİ** (WSL native), kurcalama
   tespiti dahil.
   NOT: Bu core'u opencode (big-pickle) yazamadı (3 deneme: ya
   exploration'da takılıp yazmadan çıktı, ya donup 15+ dk ilerlemedi, ya da
