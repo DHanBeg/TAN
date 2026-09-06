@@ -1,5 +1,10 @@
 # BOOTSTRAP.md — TancElf'i sıfırdan üretme (tavuk-yumurta çözümü)
 
+> Bu dosya 2026-09-07'de GÜNCEL/AKTİF talimat olarak yeniden yazıldı. Önceki
+> içerik (Go→TAN geçiş döneminin tarihsel analizi, BootstrapGoSuz.sh/
+> KanitGoSuzTarihce.sh üzerinden) SİLİNMEDİ —
+> [BOOTSTRAP_TARIHSEL_ANALIZ.md](BOOTSTRAP_TARIHSEL_ANALIZ.md)'ye taşındı.
+
 ## Neden bu dosya var
 
 TancElf (`TancElf.tan`) **kendi kendini derleyen** (self-hosted) bir
