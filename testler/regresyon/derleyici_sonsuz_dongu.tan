@@ -1,0 +1,145 @@
+# ============================================================
+# derleyici_sonsuz_dongu.tan — DONMUŞ REGRESYON (2026-09-06, Faz 2-a)
+# ------------------------------------------------------------
+# BU DOSYA KASITLI OLARAK TancElf'i SONSUZA KADAR ASAR. TestAraclar.sh'nin
+# `testler/*_testleri.tan` glob'una GİRMEYECEK ŞEKİLDE (bu alt dizinde,
+# ayrı isim deseninde) yerleştirildi — normal regresyon koşusunu kilitlemesin
+# diye. Bu dosyayı SADECE `timeout N ./TancElf ... ` ile, elle çalıştır.
+#
+# NE BULUNDU (izolasyon kanıtı, TAN — Faz 1 sonrası, sözlük öldürme
+# görevi sırasında keşfedildi — sözlük'le İLGİSİZ, derleyici çekirdeği
+# bug'ı):
+#
+#   `kutuphane/BAgaci.tan`'ı derlemeye çalışırken TancElf 4+ dakika %100
+#   CPU'da donup hiç bitmedi (normalde saniyeler sürer). Bisection +
+#   yaz()-marker enstrümantasyonuyla izole edildi:
+#
+#   1) Taramageçişleri (islevDonusTipleriTara, parametreTipleriniTara,
+#      ulasilabilirIslevleriTara) HEPSİ hızlı ve doğru tamamlanıyor —
+#      marker'lar bunu kanıtladı (bkz. asagidaki "yaz marker" kaniti).
+#      Donma bunlarda DEĞİL, `blokDerle` (kod üretim geçişi) içinde.
+#
+#   2) Minimal tetikleyici: `her X liste içinde ... son` (foreach)
+#      GÖVDESİ İÇİNDE bir `eğer ... ise ... değilse eğer ... ise ... son`
+#      (elif) zinciri. TEK BAŞINA (küçük/sentetik dosyada, 0-14 sahte
+#      fonksiyon önekiyle denendi) bu desen HİÇ donmuyor (bkz. synth_0..14
+#      testleri, hepsi temiz derlendi). `parçala()` çağrısının varlığı/
+#      yokluğu SONUCU DEĞİŞTİRMİYOR (P2: sadece parçala, elif yok → donmuyor;
+#      P1: sadece elif, parçala yok → DONUYOR).
+#
+#   3) Donma SADECE bu elif-içinde-foreach deseni, BAgaci.tan'ın kendi ilk
+#      128 satırının (globaller + araligi + digerleriEkleyerekOlustur +
+#      bagacAyarla + bagacDugumOlustur + yaprakBol fonksiyonları, aşağıda
+#      DONDURULMUŞ KOPYA olarak birebir gömülü) ARDINDAN geldiğinde ortaya
+#      çıkıyor. İlk 105 satır (yaprakBol HARİÇ) yeterli DEĞİL — donma yok,
+#      temiz `BAGLAMA HATASI: etiket bulunamadi: f_sözlük` veriyor. yaprakBol
+#      dahil olunca (111-128 satır) donma başlıyor. Yani hem (a) belli bir
+#      önceki kod karmaşıklığı hem (b) elif-içinde-foreach ikisi BİRLİKTE
+#      gerekiyor — sebep TAM OLARAK NEREDE (blokDerle içinde hangi satır)
+#      HENÜZ BULUNMADI, bu Faz 2-b'nin işi.
+#
+#   4) sözlük() ile İLGİSİZ olduğu doğrulandı: bu dosyadaki sözlük()
+#      çağrıları (kYaprakMi/kAnahtarlar/vb.) zaten link aşamasında ayrı
+#      ayrı temiz hata verir (bkz Faz 1 kapanışı) — donma bundan farklı bir
+#      AŞAMADA (blokDerle, linkten ÖNCE) oluyor, sözlük'ün varlığı/yokluğu
+#      donma davranışını DEĞİŞTİRMEDİ (denendi: sözlük() çağrıları çıkarılıp
+#      düz skaler değişkenle değiştirilince de aynı donma sürdü).
+#
+# YENİDEN ÜRETME:
+#   cd tan/ (repo kökü)
+#   timeout 10 ./TancElf testler/regresyon/derleyici_sonsuz_dongu.tan /tmp/out
+#   # cikis kodu 124 (timeout) = hala kirik. Duzeltildikten sonra: hizli,
+#   # cikis kodu 0, /tmp/out gercek bir binary olmali.
+#
+# KOD DEĞİŞİKLİĞİ YAPILMADI — bu dosya SADECE hatayı kafese alıp
+# tekrarlanabilir kılmak için var (Faz 2-a kapsamı). Asıl düzeltme (hangi
+# blokDerle dalının sonsuz döngüye girdiğini bulup düzeltmek) Faz 2-b.
+# ============================================================
+
+kKokKutu = [0]
+kDereceKutu = [4]
+kWalYoluKutu = [""]
+kSayacKutu = [0]
+kYaprakMi = sözlük()
+kAnahtarlar = sözlük()
+kDegerler = sözlük()
+kCocuklar = sözlük()
+kSonraki = sözlük()
+
+işlev araligi(liste, bas, sonIndeks)
+    sonuc = []
+    i = bas
+    iken i < sonIndeks
+        sonuc = ekle(sonuc, liste[i])
+        i = i + 1
+    son
+    döndür sonuc
+son
+
+işlev digerleriEkleyerekOlustur(liste, konum, deger)
+    sonuc = []
+    i = 0
+    iken i < konum
+        sonuc = ekle(sonuc, liste[i])
+        i = i + 1
+    son
+    sonuc = ekle(sonuc, deger)
+    iken i < uzunluk(liste)
+        sonuc = ekle(sonuc, liste[i])
+        i = i + 1
+    son
+    döndür sonuc
+son
+
+işlev bagacAyarla(derece, walYolu)
+    kDereceKutu[0] = derece
+    kWalYoluKutu[0] = walYolu
+son
+
+işlev bagacDugumOlustur(yaprakMi)
+    id = kSayacKutu[0]
+    kSayacKutu[0] = id + 1
+    kYaprakMi[id] = yaprakMi
+    kAnahtarlar[id] = []
+    kDegerler[id] = []
+    kCocuklar[id] = []
+    kSonraki[id] = 0 - 1
+    döndür id
+son
+
+kKokKutu[0] = bagacDugumOlustur(1)
+
+işlev yaprakBol(dugumId)
+    anahtarlar = kAnahtarlar[dugumId]
+    degerler = kDegerler[dugumId]
+    n = uzunluk(anahtarlar)
+    orta = tamBol(n, 2)
+    solAnahtarlar = araligi(anahtarlar, 0, orta)
+    solDegerler = araligi(degerler, 0, orta)
+    sagAnahtarlar = araligi(anahtarlar, orta, n)
+    sagDegerler = araligi(degerler, orta, n)
+    yeniId = bagacDugumOlustur(1)
+    kAnahtarlar[dugumId] = solAnahtarlar
+    kDegerler[dugumId] = solDegerler
+    kAnahtarlar[yeniId] = sagAnahtarlar
+    kDegerler[yeniId] = sagDegerler
+    kSonraki[yeniId] = kSonraki[dugumId]
+    kSonraki[dugumId] = yeniId
+    döndür [sagAnahtarlar[0], yeniId]
+son
+
+# --- TETİKLEYİCİ: minimal desen (P1, izole edilmiş minimal hâli) ---
+# foreach GÖVDESİ İÇİNDE eğer/değilse eğer (elif) zinciri — bu, yukarıdaki
+# 5 fonksiyonun (özellikle yaprakBol'un) ARDINDAN gelince donuyor. Tek
+# başına (bkz. synth_N testleri, dosya başlığı) donmuyor.
+işlev tetikleyici()
+    satirlar = [1, 2, 3]
+    her satir satirlar içinde
+        eğer satir == 1 ise
+            yaz(1)
+        değilse eğer satir == 2 ise
+            yaz(2)
+        son
+    son
+    döndür 1
+son
