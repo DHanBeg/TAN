@@ -4021,6 +4021,33 @@ son
 # çünkü döndür'lerin hangi işleve ait olduğunu ayırt etmek bu basit
 # tarayıcının kapsamı dışında.
 işlev islevGovdeSonBul(tokenler, baslangic)
+    # DÜZELTME (2026-09-06, Faz 2-b): "değilse eğer" bir elif ZİNCİRİNİN
+    # DEVAMI, yeni bir iç içe blok DEĞİL — deyimDerle (satır ~862-901)
+    # bu yüzden zincirin TÜMÜNÜ TEK "son" ile kapatıyor (satır 848-861'deki
+    # kendi notu: "özyineleme YERİNE döngü — TÜM elif dallarını TEK 'iken
+    # doğru' ile gez, 'son'u SADECE ZİNCİRİN SONUNDA, TEK SEFER tüket").
+    # Bu fonksiyon ESKİDEN her "eğer" görüşünde KOŞULSUZ derinlik+1
+    # yapıyordu — bir elif zincirinde HER "değilse eğer" için fazladan bir
+    # "son" bekliyordu ki o hiç yoktu. Sonuç: derinlik asla 0'a inmiyor,
+    # tarama dosya sonuna (uzunluk(tokenler)) kadar gidiyordu. Bu, hem
+    # burada (satır ~1008-1011'deki "ulaşılamaz işlev" atlama döngüsü,
+    # pIlerle'nin uzunluk(tokenler)-1'de kilitlenmesiyle birleşip sonsuz
+    # döngü) hem de islevGovdeHaritasiCikar (satır ~5097, bu fonksiyonu
+    # çağırıyor) üzerinden ulasilabilirIslevleriTara'nın reachability
+    # hesabını ZEHİRLEYİP GERÇEKTEN ÇAĞRILAN fonksiyonları bile ulaşılamaz
+    # gösteriyordu — bkz testler/regresyon/derleyici_sonsuz_dongu.tan.
+    #
+    # Düzeltme: "eğer" SADECE bir önceki token "değilse" DEĞİLSE yeni bir
+    # iç içe blok sayılır (derinlik+1). "değilse eğer" aynı satırda
+    # bitişik yazılmak ZORUNDA (tokenizer boşluk/yorum için token
+    # ÜRETMİYOR, satır 116-130 — araya sadece SATIRSONU girebilir, o da
+    # zaten deyimDerle'nin KENDİ "değilse eğer" tanımasında elif-devamı
+    # SAYILMIYOR, ayrı bir iç içe if/son'dur) — bu yüzden "bir önceki
+    # token" kontrolü "bir önceki ANLAMLI token" ile birebir aynı, ek
+    # atlama gerekmiyor. Simetri: "son" tarafı DOKUNULMADI (koşulsuz
+    # kalıyor) — zincirin tek "son"u zaten öyleydi, fazla sayılan sadece
+    # "eğer" tarafıydı; kağıt üzerinde 3 desen (elif zinciri / düz iç içe
+    # if / elif dalı içinde nested if) doğrulandı, hepsi tam 0'a dönüyor.
     n = uzunluk(tokenler)
     derinlik = 1
     i = baslangic
@@ -4028,11 +4055,19 @@ işlev islevGovdeSonBul(tokenler, baslangic)
     iken derinlik > 0 ve i < n
         t = alan(tokenler[i], 0)
         d = alan(tokenler[i], 1)
-        eğer t == "ANAHTAR" ve (d == "işlev" veya d == "eğer" veya d == "iken" veya d == "her") ise
-            eğer d == "işlev" ise
-                iceIslevVar = 1
-            son
+        eğer t == "ANAHTAR" ve d == "işlev" ise
+            iceIslevVar = 1
             derinlik = derinlik + 1
+        değilse eğer t == "ANAHTAR" ve (d == "iken" veya d == "her") ise
+            derinlik = derinlik + 1
+        değilse eğer t == "ANAHTAR" ve d == "eğer" ise
+            oncekiDegilseMi = 0
+            eğer i > 0 ve alan(tokenler[i - 1], 0) == "ANAHTAR" ve alan(tokenler[i - 1], 1) == "değilse" ise
+                oncekiDegilseMi = 1
+            son
+            eğer oncekiDegilseMi == 0 ise
+                derinlik = derinlik + 1
+            son
         değilse eğer t == "ANAHTAR" ve d == "son" ise
             derinlik = derinlik - 1
         son
