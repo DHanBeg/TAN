@@ -242,20 +242,77 @@ import edilmiyorlar. Listeye yazıldı, kaldırma kararı ayrı bir turda.
   global değişkene GÜVENİLİR ERİŞEMİYOR — modül-seviyesi bir sayaç +
   onu okuyan yardımcı fonksiyon SEGFAULT verdi. Düzeltme: global state
   kaldırıldı, çağıran kendi sayacını (bir "kutu") parametre olarak besliyor.
-- **ACID durumu (dürüst):** Atomicity EVET (rollback doğrulandı — tek
-  sayfa VE çok-sayfalı senaryo), Consistency uygulama sorumluluğu,
-  **Isolation YOK** (tek-thread varsayımı, 2D hâlâ yazılmadı),
-  **Durability KISMİ** (fsync yok — 2B'nin sınırı; crash-recovery/REDO bu
-  eklemenin kapsamı DIŞINDA, sadece çalışan process içi rollback var).
-- **Doğrulama:** `testler/storage_testleri.tan` — 13/13 GEÇTİ (temel
-  ayır/yaz/oku, kalıcılık, commit, rollback tek-sayfa, rollback çok-sayfa),
-  `TestAraclar.sh`'ye otomatik dahil (kalıcı regresyon), iki kez üst üste
-  çalıştırılıp idempotent olduğu doğrulandı. `veta/tests/test_file_io.tan`/
+- **ACID durumu (dürüst, 2026-09-09 güncellemesi — aşağıdaki DÜZELTME'yi
+  gör, bu satırlar ARTIK BAYAT):** ~~Atomicity EVET, Consistency uygulama
+  sorumluluğu, Isolation YOK, Durability KISMİ (fsync yok, crash-recovery
+  yok)~~.
+- **Doğrulama (BAYAT, 13/13 sayısı artık yanlış — aşağıya bak):**
+  ~~`testler/storage_testleri.tan` — 13/13 GEÇTİ~~. `TestAraclar.sh`'ye
+  otomatik dahil (kalıcı regresyon), iki kez üst üste çalıştırılıp
+  idempotent olduğu doğrulandı. `veta/tests/test_file_io.tan`/
   `test_storage.tan`/`test_wal.tan`/`test_transaction.tan` (önceden hiç
   derlenmeyen sahte testlerdi) yeni API ile çalışır hale getirildi.
   TancElf.tan bu turda DEĞİŞMEDİ (saf kütüphane kodu) — self-hosting
   riski yok, ama yine de tam regresyon (TestArkaUcGoSuzTemiz.sh,
   TestFormatIdempotent) yeşil doğrulandı.
+
+- **DÜZELTME (2026-09-09, WAL crash-recovery + crash-gate denetimi —
+  yukarıdaki ACID/13-13 satırları artık BAYAT, güncel durum budur):**
+  - **fsync EKLENDİ** (`dosyaSenkron`, TancElf.tan sys_fsync=74, 2026-09-07)
+    — `Islem.tan:islemCommit` her commit'te çağırıyor (her-commit-fsync).
+  - **Crash-recovery EKLENDİ** (`Islem.tan:islemKurtar`) — commit-marker
+    ("C:" kaydı) + streaming REDO (komitli tx'lerin sayfa yazımlarını
+    tekrar uygular) + streaming UNDO (komitsiz/yarım tx'leri geri alır).
+    Gerçek SIGKILL ile doğrulandı (`testler/wal_crash_harness.sh` —
+    yazıcı process arka planda başlatılıp GERÇEKTEN `kill -9` ile
+    öldürülüyor, tamamen ayrı bir recovery process'i sonucu okuyor): (1)
+    commit-öncesi öldürme → UNDO doğru, (2) commit-sonrası öldürme →
+    veri kalıcı. **Test edilemeyen tek nokta:** commit-marker yazıldı ama
+    fsync tamamlanmadan çökme — SIGKILL bunu izole edemez (write()
+    kernel'e ulaştıysa process ölse de sayfa cache'te kalır, ancak gerçek
+    power-loss/OS-crash bunu ayırt eder, WSL'de yok). Pratik karşılığı:
+    checksum-halt testi (`walGecerliSinir` bozuk kayıtta durur, ayrı
+    doğrulandı).
+  - **ACID (güncel, dürüst):** Atomicity EVET (rollback + crash-recovery
+    ikisi de doğrulandı), Consistency uygulama sorumluluğu, **Isolation
+    YOK** (tek-thread varsayımı, 2D hâlâ yazılmadı), **Durability EVET**
+    (commit-zamanlı fsync + REDO/UNDO — yukarıdaki tek istisna hariç).
+  - **Checksum: CRC32, SHA-256 DEĞİL** (`kutuphane/crc32.tan`, tablo/liste
+    kurmayan bit-bit fold). İLK sürüm SHA-256 kullanmıştı — WAL'ın 8KB'lık
+    kayıtlarında `sha256.tan`'ın kendi O(n²)+sızıntı kusuruna çarpıp
+    crash-recovery testinde GB'larca RAM tüketip OOM + bir kez WSL
+    çökmesine yol açtı (bkz. aşağıdaki "Foundation-debt" maddeleri).
+    Geri alındı, CRC32'ye geçildi — WAL'ın tehdit modeli (crash/torn-write,
+    adversary değil) zaten CRC32'yi yeterli kılıyordu.
+  - **`metinDilim` builtin'i eklendi** (TancElf.tan, TEK allocate+TEK
+    bellek_kopyala) — `walIcerikNormalize`/`walAltMetin`/`pmSayfaOku`/
+    `pmSayfaYaz`'daki tek-karakter `metinBirlestir` döngüsü O(n²)+sızıntı
+    üretiyordu, O(n)'e indirildi.
+  - **Ölçüm (varsayım değil, ölçüldü):** `testler/storage_testleri.tan`
+    (19/19 GEÇTİ — REDO/UNDO/checksum-halt dahil) temiz dosyalarla
+    **MAXRSS 384 kB**. "Sızıntı yok" DENMİYOR — bu 19 test dominant ÜÇ
+    O(n²) sitesini (metinDilim öncesi Wal/PageManager karakter-döngüsü,
+    sha256.tan'ın byte-listesi) kapattığını kanıtlıyor, beşinci bir site
+    olmadığını KANITLAMAZ.
+  - **Foundation-debt (ledger, iki madde — WAL'ı bloke ETMİYOR ama
+    gelecekteki her yeni VETA katmanı sızıntı yüzeyini çarpanlıyor):**
+    1. **`kutuphane/sha256.tan` O(n²)+sızıntı** — kendi notunda artık
+       uyarı var: birkaç yüz bayt üstünde KULLANILMAMALI. WAL'dan
+       çıkarıldı ama dosyanın kendisi düzeltilmedi (küçük girdide hâlâ
+       kullanılabilir — imza/registry-anahtar boyutu).
+    2. **TancElf.tan allocator'ı (`f_tan_ayir`, `tanAyirBant`) saf bump
+       allocator — free/reset YOK, `brk` ile sadece büyüyor.** Bulk-
+       builtin (metinDilim) tek-çağrı sızıntısını n²'den n'e indirdi ama
+       KAPATMADI — uzun-ömürlü bir DB process'i milyonlarca işlemde
+       yine belleği tüketir ("12 saniyede çöküyor" → "saatlerde çöküyor",
+       erteleme, düzeltme değil). Region-reset KASITLI OLARAK
+       denenmedi — tek-global bump'ta scope'u aşan bir allocation
+       dangling pointer/sessiz veri bozulmasına yol açar (OOM'dan beter).
+       Gerçek çözüm scoped/local arena (fonksiyon-scratch → sonuç
+       kopyala → geri sar) — ayrı, kilitlenmemiş bir tasarım kararı.
+       **Sıradaki VETA katmanından ÖNCE bu kapanmalı** — WAL bu allocator
+       borcuna iki kez çarptı (string-padding, sha256), üçüncü katman
+       biriktirmeden kapatılacak.
 
 #### Query (Sorgu) — MİNİMAL DİLİM UYGULANDI (2026-08-23, gerçekten çalıştırıldı)
 - `libraries/query/source/query.tan`: eski tasarım yorumu KORUNDU, altına

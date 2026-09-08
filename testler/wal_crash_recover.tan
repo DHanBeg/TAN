@@ -1,0 +1,29 @@
+# wal_crash_recover.tan — TAMAMEN AYRI bir process (öldürülen yazıcı ile
+# hiçbir bellek/durum paylaşmaz) db+wal dosyalarını sıfırdan açar,
+# islemKurtar() çalıştırır, hedef sayfanın son halini basar. Gerçek
+# crash-recovery: process sınırı gerçek, dosya durumu gerçek.
+#
+# arg(1)=db yolu, arg(2)=wal yolu
+
+içe al "kutuphane/Islem.tan"
+
+işlev ilkN(s, n)
+    r = ""
+    i = 0
+    iken i < n
+        r = metinBirlestir(r, metinAl(s, i))
+        i = i + 1
+    son
+    döndür r
+son
+
+dbYol = arg(1)
+walYol = arg(2)
+
+pm = pmAc(dbYol)
+wal = walAc(walYol)
+sinir = islemKurtar(pm, wal)
+
+icerik = pmSayfaOku(pm, 1)
+yaz(metinBirlestir("SONUC:", ilkN(icerik, 12)))
+yaz(metinBirlestir("SINIR:", metin(sinir)))

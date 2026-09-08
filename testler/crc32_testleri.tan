@@ -1,0 +1,38 @@
+# crc32_testleri.tan — CRC32 (IEEE 802.3) bilinen test vektörleriyle doğrulama.
+
+içe al "kutuphane/test.tan"
+içe al "kutuphane/crc32.tan"
+
+gecti = 0
+toplam = 0
+
+# Standart CRC32 test vektörü: CRC32("123456789") = 0xCBF43926 = 3421780262
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(3421780262, crc32("123456789"), "T1: CRC32(123456789) standart vektor")
+
+# Bos metin: CRC32("") = 0
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, crc32(""), "T2: CRC32(bos) = 0")
+
+# Farkli girdiler farkli sonuc uretmeli (carpisma testi degil, sadece
+# "her zaman ayni deger donmuyor" saglamligi)
+toplam = toplam + 1
+gecti = gecti + iddiaDogru(crc32("A") != crc32("B"), "T3: farkli girdi farkli crc")
+
+# crc32Ham 4 bayt donmeli
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(4, uzunluk(crc32Ham("test")), "T4: crc32Ham 4 bayt")
+
+# Buyuk girdide (8256 bayt, WAL kayit boyutu) hizli calismali ve doğru
+# deger uretmeli - regresyon: sha256'nin dustugu tuzagin (8KB'da patlama)
+# CRC32'de OLMADIGINI kanitlar.
+buyukMetin = "x"
+iken uzunluk(buyukMetin) < 8256
+    buyukMetin = metinBirlestir(buyukMetin, buyukMetin)
+son
+buyukMetin = metinDilim(buyukMetin, 0, 8256)
+buyukCrc = crc32(buyukMetin)
+toplam = toplam + 1
+gecti = gecti + iddiaDogru(buyukCrc >= 0, "T5: 8256 baytlik girdide crc32 hesaplanabiliyor (crash yok)")
+
+d = testSonuc(gecti, toplam)

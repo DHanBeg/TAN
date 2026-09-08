@@ -20,10 +20,13 @@
 #   veri = pmSayfaOku(pm, no)          # tam PAGE_SIZE bayt döner
 #   z  = pmKapat(pm)
 #
-# BİLİNEN SINIR (dürüst): fsync YOK (TancElf'te syscall builtin'i yok,
-# bu eklemenin kapsamı dışında) — durability (ACID'in D'si) tam garanti
-# EDİLMİYOR, sadece "yazma çağrısı yapıldı" garantisi var. Tek-thread
-# varsayımı — eşzamanlı erişim (2D, hâlâ yazılmadı) YOK.
+# DÜZELTME (2026-09-08): fsync ARTIK VAR (dosyaSenkron builtin,
+# TancElf.tan sys_fsync=74, 2026-09-07 eklendi) ama BİLİNÇLİ OLARAK bu
+# katmanda KULLANILMIYOR — durability commit-zamanlı WAL fsync'i ile
+# sağlanıyor (bkz. Islem.tan:islemCommit), sayfa yazımlarının kendisi
+# senkron olmak ZORUNDA değil çünkü crash sonrası Islem.tan:islemKurtar
+# içeriği WAL'dan yeniden kurar (redo). Tek-thread varsayımı — eşzamanlı
+# erişim (2D, hâlâ yazılmadı) YOK.
 # ============================================================
 
 içe al "kutuphane/tanoku.tan"
@@ -96,19 +99,18 @@ son
 # hiç yazılmamışsa sıfır baytlarla — pread kısa okursa kalan kısmı
 # manuel sıfırla, sparse dosyanın okunmamış kısmı zaten sıfırdır ama
 # dosya o kadar büyümediyse pread daha az bayt döndürebilir).
+# DÜZELTME (2026-09-08, VETA WAL crash-gate denetimi): pmSayfaOku/
+# pmSayfaYaz eskiden tek-karakter metinBirlestir döngüsüyle dolduruyordu
+# — GC'siz arende (TancElf.tan tanAyirBant, bkz. Wal.tan:walIcerikNormalize
+# notu) O(n²) zaman + O(n²) kalıcı sızıntı, PAGE_SIZE=4096 için ~8M
+# karakterlik ara-çöp TEK ÇAĞRIDA. metinDilim (TEK allocate+TEK
+# bellek_kopyala) ile O(n)'e indirildi — GC yokluğu KAPANMADI (foundation-
+# debt, ayrı iş), sadece katsayı n²'den n'e indi.
 işlev pmSayfaOku(pm, sayfaNo)
     fd = pm[0]
     konum = sayfaNo * pageBoyut()
-    ham = metinBirlestir("", dosyaOkuKonum(fd, konum, pageBoyut()))
-    eğer uzunluk(ham) < pageBoyut() ise
-        dolgu = pageBoyut() - uzunluk(ham)
-        i = 0
-        iken i < dolgu
-            ham = metinBirlestir(ham, karakter(0))
-            i = i + 1
-        son
-    son
-    döndür ham
+    ham = dosyaOkuKonum(fd, konum, pageBoyut())
+    döndür metinDilim(ham, 0, pageBoyut())
 son
 
 # sayfaNo'ya icerik yazar (PAGE_SIZE'dan kısaysa sıfırla doldurulur,
@@ -116,25 +118,7 @@ son
 işlev pmSayfaYaz(pm, sayfaNo, icerik)
     fd = pm[0]
     konum = sayfaNo * pageBoyut()
-    n = uzunluk(icerik)
-    eğer n > pageBoyut() ise
-        yazilacak = ""
-        i = 0
-        iken i < pageBoyut()
-            yazilacak = metinBirlestir(yazilacak, metinAl(icerik, i))
-            i = i + 1
-        son
-    değilse eğer n < pageBoyut() ise
-        yazilacak = icerik
-        dolgu = pageBoyut() - n
-        i = 0
-        iken i < dolgu
-            yazilacak = metinBirlestir(yazilacak, karakter(0))
-            i = i + 1
-        son
-    değilse
-        yazilacak = icerik
-    son
+    yazilacak = metinDilim(icerik, 0, pageBoyut())
     döndür dosyaYazKonum(fd, konum, yazilacak)
 son
 

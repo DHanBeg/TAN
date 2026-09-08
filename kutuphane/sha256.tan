@@ -2,7 +2,22 @@
 # << >>) gerektirir — TancElf'e madde 2C ile eklendi. Kaldıraç 4 (imzalı/
 # içerik-adresli registry) için gerçek kriptografik bütünlük.
 # sha256(metin) → 64 karakter hex özet. Doğrulandı: NIST test vektörleri.
-# NOT: bayt listesi ekle() O(n²) — küçük kaynak dosyaları için uygun.
+#
+# UYARI (2026-09-09, VETA WAL crash-gate denetimi — FOUNDATION-DEBT):
+# "bayt listesi ekle() O(n²) — küçük kaynak dosyaları için uygun" notu
+# YETERSİZ UYARIYDI, yükseltiliyor: birkaç YÜZ BAYTIN ÜSTÜNDE (kesin sınır
+# ölçülmedi, ~1-2KB üstünde risk büyür) KULLANILMAMALI. Kök neden: mesaj
+# ekle() ile bayt-listesine çevriliyor (satır ~46), ekle() KOPYALAYARAK
+# büyüyor (asla yerinde değiştirmez) — GC'siz arende (TancElf.tan
+# tanAyirBant, reuse/free yok) bu hem O(n²) zaman hem O(n²) KALICI
+# sızıntı demek. Somut vaka: Wal.tan bunu 8KB'lık sayfa kayıtlarında
+# kullanmıştı, tek hash çağrısı ~500MB+ sızdırdı, crash-recovery testinde
+# birkaç kayıtta GB'lara çıkıp OOM + bir kez WSL çökmesine yol açtı.
+# Wal.tan artık CRC32'ye geçti (kutuphane/crc32.tan, crash-integrity için
+# yeterli, tablo/liste kurmayan fold). BU DOSYA DÜZELTİLMEDİ — büyük
+# girdide O(n²)+sızıntı hâlâ AÇIK, ayrı foundation-debt (allocator'ın
+# free/reuse eksikliğiyle aynı ailede, bkz. [[project_tan_selfhosting]]).
+# Küçük girdide (imza/registry-anahtar boyutu) kullanmaya devam edilebilir.
 
 işlev sha256Rotr(x, n)
     döndür ((x >> n) | (x << (32 - n))) & 4294967295

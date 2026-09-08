@@ -43,19 +43,19 @@
 #   yorumlayici  : metin rune dizisidir,  "ğ" -> 287 (tek deger)
 # Ikisini de harf saymak, "eğer" gibi anahtarlarin HER IKI ARKA UCTA da
 # tek parca kalmasini saglar.
-işlev harfMi(k)
+işlev harfMi(k):
     döndür (k >= 97 ve k <= 122) veya (k >= 65 ve k <= 90) veya k == 95 veya k >= 128
 son
 
-işlev rakamMi(k)
+işlev rakamMi(k):
     döndür k >= 48 ve k <= 57
 son
 
-işlev bosMu(k)
+işlev bosMu(k):
     döndür k == 32 veya k == 9 veya k == 13
 son
 
-işlev anahtarMi(kelime, anahtarlar)
+işlev anahtarMi(kelime, anahtarlar):
     # metinEsit() kullanılıyor, "==" DEĞİL — bkz. metinEsit CAGRI notu:
     # her-döngü değişkeni (a) VE parametre (kelime) İKİSİ DE varsayılan "tam"
     # tipinde kaldığından "==" düz tam sayı (işaretçi) karşılaştırması yapıp
@@ -68,7 +68,7 @@ işlev anahtarMi(kelime, anahtarlar)
     döndür 0
 son
 
-işlev kacisCoz(k)
+işlev kacisCoz(k):
     eğer k == "n" ise
         döndür karakter(10)
     son
@@ -81,7 +81,7 @@ işlev kacisCoz(k)
     döndür k
 son
 
-işlev tokenKodla(tur, deger, satir, soh)
+işlev tokenKodla(tur, deger, satir, soh):
     # metinBirlestir kullanılıyor, "+" DEĞİL — tur/deger/soh HEPSİ parametre
     # olduğundan tipleri hep "tam" sanılıyordu, "+" zinciri tam sayı toplaması
     # yapıp token kaydını bozuyordu (bkz. metinBirlestir CAGRI notu).
@@ -93,7 +93,7 @@ son
 
 # tokenle: kaynağı TEK düz metin listesine çözer.
 # Her öge "TUR<SOH>DEGER<SOH>SATIR" biçiminde kodludur.
-işlev tokenle(kaynak)
+işlev tokenle(kaynak):
     soh = karakter(1)
     anahtarlar = ["yaz", "eğer", "ise", "değilse", "iken", "işlev", "döndür", "son", "her", "içinde", "dur", "devam", "içe", "al", "doğru", "yanlış", "yok", "ve", "veya", "değil", "köprü", "dene", "yakala"]
     # TAMPON KULLANIYOR (bkz. "TAMPON" başlığı) — TancElf.tan'ın kendi
@@ -252,7 +252,7 @@ son
 # ayrıştırma fonksiyonunun KENDİ bandını inşa edip DÖNDÜRMESİYLE, çağıranın
 # da listeBirlestir ile parça bantları birleştirmesiyle akıyor.
 
-işlev listeBirlestir(a, b)
+işlev listeBirlestir(a, b):
     sonuc = a
     her x b içinde
         sonuc = ekle(sonuc, x)
@@ -277,11 +277,11 @@ son
 # çalışmıyor — öge tipi yalnız 0. öğeden çıkarılıyor. Bu yüzden TEK bir
 # karışık kutu yerine İKİ AYRI kutu (tamponKutu: liste, nKutu: sayı)
 # kullanılıyor — Go'nun sağladığı Tampon.tan örneğiyle birebir aynı desen.
-işlev tamponOlustur()
+işlev tamponOlustur():
     döndür [listeYap(64, 0)]
 son
 
-işlev tamponEkle(tamponKutu, nKutu, deger)
+işlev tamponEkle(tamponKutu, nKutu, deger):
     liste = tamponKutu[0]
     n = nKutu[0]
     kap = uzunluk(liste)
@@ -306,7 +306,7 @@ son
 
 # tamponEkleTumu: bir bandın (liste) TÜM ögelerini tampona ekler —
 # "kod = listeBirlestir(kod, X)" yerine kullanılır.
-işlev tamponEkleTumu(tamponKutu, nKutu, digerListe)
+işlev tamponEkleTumu(tamponKutu, nKutu, digerListe):
     her x digerListe içinde
         z = tamponEkle(tamponKutu, nKutu, x)
     son
@@ -315,7 +315,7 @@ son
 
 # tamponSonuc: tamponu TAM boyuta (n) kırpılmış düz liste olarak döndürür —
 # TEK SEFERLİK O(n) maliyet, fonksiyon dönerken bir kez çağrılır.
-işlev tamponSonuc(tamponKutu, nKutu)
+işlev tamponSonuc(tamponKutu, nKutu):
     liste = tamponKutu[0]
     n = nKutu[0]
     sonuc = listeYap(n, 0)
@@ -328,7 +328,7 @@ işlev tamponSonuc(tamponKutu, nKutu)
 son
 
 # alan(s, alanNo): SOH ayraçlı 3-alanlı bir kaydın alanNo'ıncı (0/1/2) alanı
-işlev alan(s, alanNo)
+işlev alan(s, alanNo):
     # metinAl/metinEsit/metinBirlestir kullanılıyor, "s[i]"/"=="/"+ DEĞİL —
     # s bir PARAMETRE olduğundan tipi hep "tam" sanılıyordu (TancElf.tan'ın
     # kendi parametre tipi çıkarımı yok — bkz. islevDerle notu); "s[i]" bu
@@ -352,7 +352,7 @@ işlev alan(s, alanNo)
     döndür sonuc
 son
 
-işlev karakterVarMi(s, aranan)
+işlev karakterVarMi(s, aranan):
     # metinAl/metinEsit — s parametre olduğundan tipi hep "tam" sanılıyordu.
     n = uzunluk(s)
     i = 0
@@ -366,7 +366,7 @@ işlev karakterVarMi(s, aranan)
 son
 
 # s, onek ile mi başlıyor? (K5 DWARF: "Lsatir" etiketlerini süzmek için)
-işlev onekMi(s, onek)
+işlev onekMi(s, onek):
     ns = uzunluk(s)
     no = uzunluk(onek)
     eğer ns < no ise
@@ -382,7 +382,7 @@ işlev onekMi(s, onek)
     döndür 1
 son
 
-işlev bc(op, a1, a2)
+işlev bc(op, a1, a2):
     # ÖNCEDEN "op + soh + a1 + soh + a2" (düz "+") kullanıyordu. op/a1/a2
     # PARAMETRE olduğundan TancElf.tan'ın kendi tip çıkarımı onları hep
     # "tam" sanıyor (parametre tipi çıkarımı YOK — bkz. islevDerle notu).
@@ -401,22 +401,22 @@ işlev bc(op, a1, a2)
 son
 
 # --- konum imleci yardımcıları: pozKutu HER ZAMAN tek elemanlı liste ---
-işlev pTur(tokenler, pozKutu)
+işlev pTur(tokenler, pozKutu):
     döndür alan(tokenler[pozKutu[0]], 0)
 son
 
-işlev pDeger(tokenler, pozKutu)
+işlev pDeger(tokenler, pozKutu):
     döndür alan(tokenler[pozKutu[0]], 1)
 son
 
-işlev pIlerle(tokenler, pozKutu)
+işlev pIlerle(tokenler, pozKutu):
     eğer pozKutu[0] < uzunluk(tokenler) - 1 ise
         pozKutu[0] = pozKutu[0] + 1
     son
     döndür 0
 son
 
-işlev pSatirlariAtla(tokenler, pozKutu)
+işlev pSatirlariAtla(tokenler, pozKutu):
     iken pTur(tokenler, pozKutu) == "SATIRSONU"
         x = pIlerle(tokenler, pozKutu)
     son
@@ -426,11 +426,11 @@ son
 # ifadeAyristir == en düşük öncelik (mantıksal ve/veya) — DOKUMANTASYON.md
 # öncelik tablosuyla birebir: 1 ve/veya, 2 karşılaştırma, 3 +/-, 4 */%%,
 # ardından son-ek [indeks], en içte temel (sabit/ad/çağrı/parantez/tekli-).
-işlev ifadeAyristir(tokenler, pozKutu, sayacKutu)
+işlev ifadeAyristir(tokenler, pozKutu, sayacKutu):
     döndür mantiksalAyristir(tokenler, pozKutu, sayacKutu)
 son
 
-işlev mantiksalAyristir(tokenler, pozKutu, sayacKutu)
+işlev mantiksalAyristir(tokenler, pozKutu, sayacKutu):
     bant = karsilastirmaAyristir(tokenler, pozKutu, sayacKutu)
     iken pTur(tokenler, pozKutu) == "ANAHTAR" ve (pDeger(tokenler, pozKutu) == "ve" veya pDeger(tokenler, pozKutu) == "veya")
         islec = pDeger(tokenler, pozKutu)
@@ -461,7 +461,7 @@ son
 # ve: sol yanlışsa (0) SAĞ HİÇ ÇALIŞMAZ, sonuç 0. sol doğruysa sağ çalışır,
 #     sonucu (0/1'e normalize edilmiş) kullanılır.
 # veya: sol doğruysa (≠0) SAĞ HİÇ ÇALIŞMAZ, sonuç 1. sol yanlışsa sağ çalışır.
-işlev kisaDevreBirlestir(islec, sagBant, sayacKutu)
+işlev kisaDevreBirlestir(islec, sagBant, sayacKutu):
     etAtla = yeniEtiket(sayacKutu, "Lkd")
     etSon = yeniEtiket(sayacKutu, "Lkdson")
     kanonikDeger = 0
@@ -499,7 +499,7 @@ işlev kisaDevreBirlestir(islec, sagBant, sayacKutu)
     döndür bant
 son
 
-işlev karsilastirmaAyristir(tokenler, pozKutu, sayacKutu)
+işlev karsilastirmaAyristir(tokenler, pozKutu, sayacKutu):
     bant = toplamaAyristir(tokenler, pozKutu, sayacKutu)
     iken pTur(tokenler, pozKutu) == "ISLEC" ve (pDeger(tokenler, pozKutu) == ">" veya pDeger(tokenler, pozKutu) == "<" veya pDeger(tokenler, pozKutu) == ">=" veya pDeger(tokenler, pozKutu) == "<=" veya pDeger(tokenler, pozKutu) == "==" veya pDeger(tokenler, pozKutu) == "!=")
         islec = pDeger(tokenler, pozKutu)
@@ -512,7 +512,7 @@ işlev karsilastirmaAyristir(tokenler, pozKutu, sayacKutu)
     döndür bant
 son
 
-işlev toplamaAyristir(tokenler, pozKutu, sayacKutu)
+işlev toplamaAyristir(tokenler, pozKutu, sayacKutu):
     bant = bitselAyristir(tokenler, pozKutu, sayacKutu)
     iken pTur(tokenler, pozKutu) == "ISLEC" ve (pDeger(tokenler, pozKutu) == "+" veya pDeger(tokenler, pozKutu) == "-")
         islec = pDeger(tokenler, pozKutu)
@@ -526,7 +526,7 @@ işlev toplamaAyristir(tokenler, pozKutu, sayacKutu)
 son
 
 # bitsel/kaydırma katmanı: & | ^ << >>  (toplama ile carpma arası öncelik)
-işlev bitselAyristir(tokenler, pozKutu, sayacKutu)
+işlev bitselAyristir(tokenler, pozKutu, sayacKutu):
     bant = carpmaAyristir(tokenler, pozKutu, sayacKutu)
     iken pTur(tokenler, pozKutu) == "ISLEC" ve (pDeger(tokenler, pozKutu) == "&" veya pDeger(tokenler, pozKutu) == "|" veya pDeger(tokenler, pozKutu) == "^" veya pDeger(tokenler, pozKutu) == "<<" veya pDeger(tokenler, pozKutu) == ">>")
         islec = pDeger(tokenler, pozKutu)
@@ -539,7 +539,7 @@ işlev bitselAyristir(tokenler, pozKutu, sayacKutu)
     döndür bant
 son
 
-işlev carpmaAyristir(tokenler, pozKutu, sayacKutu)
+işlev carpmaAyristir(tokenler, pozKutu, sayacKutu):
     bant = sonEkAyristir(tokenler, pozKutu, sayacKutu)
     iken pTur(tokenler, pozKutu) == "ISLEC" ve (pDeger(tokenler, pozKutu) == "*" veya pDeger(tokenler, pozKutu) == "/" veya pDeger(tokenler, pozKutu) == "%")
         islec = pDeger(tokenler, pozKutu)
@@ -555,7 +555,7 @@ son
 # sonEkAyristir: temel değeri alır, ardından zincirleme [indeks] uygular
 # (liste[0], m[i][j]). Referans Parser.go'daki birincil()/sonEk() ikilisinin
 # birleştirilmiş hali (orada ikisi de aynı döngüyü tekrar ediyordu).
-işlev sonEkAyristir(tokenler, pozKutu, sayacKutu)
+işlev sonEkAyristir(tokenler, pozKutu, sayacKutu):
     bant = temelAyristir(tokenler, pozKutu, sayacKutu)
     iken pTur(tokenler, pozKutu) == "KOSAC"
         x = pIlerle(tokenler, pozKutu)
@@ -572,7 +572,7 @@ son
 # (son-ek indekslemeyi İÇERMEZ — "-x[0]" == "(-x)[0]"), ama "değil" son-ek
 # dahil sonEkAyristir'i alır ("değil x[0]" == "değil (x[0])"). Bu asimetri
 # Parser.go'da da böyle (temel() kendini çağırır, "değil" birincil() çağırır).
-işlev temelAyristir(tokenler, pozKutu, sayacKutu)
+işlev temelAyristir(tokenler, pozKutu, sayacKutu):
     tur = pTur(tokenler, pozKutu)
     deger = pDeger(tokenler, pozKutu)
 
@@ -685,7 +685,7 @@ son
 # değişkene atayıp "+" ile kullanmak İSTENMEYEN sonuç verir (tam sanılır).
 # Metin1/Metin2 örnekleri bu sınırın İÇİNDE kalacak şekilde yazıldı.
 
-işlev adAra(adlarKutu, ad)
+işlev adAra(adlarKutu, ad):
     # ÖNCEDEN "adlar[i] == ad" (düz "==") — ad PARAMETRE olduğundan tipi
     # "tam" sanılıyordu, karşılaştırma HİÇBİR ZAMAN eşleşmiyordu — adEkle
     # bu yüzden HER değişken REFERANSI için YENİ bir yuva açıyordu (aynı
@@ -705,7 +705,7 @@ işlev adAra(adlarKutu, ad)
     döndür 0 - 1
 son
 
-işlev adEkle(adlarKutu, ad)
+işlev adEkle(adlarKutu, ad):
     bulunan = adAra(adlarKutu, ad)
     eğer bulunan >= 0 ise
         döndür bulunan
@@ -715,7 +715,7 @@ işlev adEkle(adlarKutu, ad)
     döndür uzunluk(adlarKutu[0]) - 1
 son
 
-işlev adTipiAl(adlarKutu, ad)
+işlev adTipiAl(adlarKutu, ad):
     yuva = adAra(adlarKutu, ad)
     eğer yuva < 0 ise
         döndür "tam"
@@ -723,21 +723,21 @@ işlev adTipiAl(adlarKutu, ad)
     döndür adlarKutu[1][yuva]
 son
 
-işlev adTipiAyarla(adlarKutu, ad, tip)
+işlev adTipiAyarla(adlarKutu, ad, tip):
     yuva = adEkle(adlarKutu, ad)
     tipler = adlarKutu[1]
     tipler[yuva] = tip
     döndür 0
 son
 
-işlev yuvaDisp(indeks)
+işlev yuvaDisp(indeks):
     döndür 0 - (8 * (indeks + 1))
 son
 
 # ilkNHaric: listenin SON n elemanı çıkarılmış hali (tip yığını "pop N" için
 # — Tan'da dilim/slice yerleşiği yok, elle kopyalanıyor; yığın derinliği
 # ifade iç içeliği kadar küçük olduğundan O(derinlik) maliyet önemsiz).
-işlev ilkNHaric(l, n)
+işlev ilkNHaric(l, n):
     sonuc = []
     sinir = uzunluk(l) - n
     i = 0
@@ -749,7 +749,7 @@ işlev ilkNHaric(l, n)
 son
 
 # benzersiz etiket üreteci — sayacKutu tek elemanlı liste
-işlev yeniEtiket(sayacKutu, onEk)
+işlev yeniEtiket(sayacKutu, onEk):
     # ÖNCEDEN "onEk + metin(...)" — onEk PARAMETRE olduğundan tipi "tam"
     # sanılıyordu, "+" onEk'i SAYI gibi f_sayi_metne'den geçirip etiket
     # adını (Legerson/Ldegilse/Lbas/... öneki) ÇÖPE çeviriyordu — TÜM
@@ -767,7 +767,7 @@ son
 # ("tam"/"metin") tipKutu[0]'a yazar. Çağıran ilgilenmiyorsa tek kullanımlık
 # [""] geçip yok sayabilir (yaz/eğer/iken/döndür), ilgileniyorsa (atama)
 # adTipiAyarla ile değişken tablosuna kaydeder.
-işlev ifadeSonuc(tokenler, pozKutu, adlarKutu, sayacKutu, tipKutu, islevTipKutu)
+işlev ifadeSonuc(tokenler, pozKutu, adlarKutu, sayacKutu, tipKutu, islevTipKutu):
     rpn = ifadeAyristir(tokenler, pozKutu, sayacKutu)
     kod = ifadeBantYaz(rpn, adlarKutu, sayacKutu, tipKutu, islevTipKutu)
     döndür listeBirlestir(kod, popKayit(0))
@@ -785,7 +785,7 @@ son
 # parametreye ("dEtiketler") sıkıştırıldı (islevTipKutu eklenince 8 parametre
 # olurdu — Go referans derleyicisi bunu 7. argümanda "index out of range
 # [6] with length 6" ile YAKALADI, sessizce yanlış kod üretmedi, iyi haber).
-işlev blokDerle(tokenler, pozKutu, adlarKutu, sayacKutu, dEtiketler, islevTipKutu)
+işlev blokDerle(tokenler, pozKutu, adlarKutu, sayacKutu, dEtiketler, islevTipKutu):
     # TAMPON KULLANIYOR (bkz. "TAMPON" başlığı) — bu döngü TancElf.tan'ın
     # KENDİ kaynağı (~2400 satır, yüzlerce deyim) için en büyük O(n²)
     # kaynağıydı: her deyim "kod = listeBirlestir(kod, ...)" ile MEVCUT
@@ -818,7 +818,7 @@ işlev blokDerle(tokenler, pozKutu, adlarKutu, sayacKutu, dEtiketler, islevTipKu
     döndür tamponSonuc(kodKutu, nKutu)
 son
 
-işlev deyimDerle(tokenler, pozKutu, adlarKutu, sayacKutu, dEtiketler, islevTipKutu)
+işlev deyimDerle(tokenler, pozKutu, adlarKutu, sayacKutu, dEtiketler, islevTipKutu):
     t = pTur(tokenler, pozKutu)
     d = pDeger(tokenler, pozKutu)
 
@@ -1001,6 +1001,10 @@ işlev deyimDerle(tokenler, pozKutu, adlarKutu, sayacKutu, dEtiketler, islevTipK
         son
         x = pIlerle(tokenler, pozKutu)      # ')' yut
 
+        eğer pTur(tokenler, pozKutu) == "IKINOKTA" ise
+            x = pIlerle(tokenler, pozKutu)  # opsiyonel ':' yut — işlev adı(param): sözdizimi
+        son
+
         # --- FAZ 5 (A): erişilemeyen işlevi derleme (ölü budama) ---
         # islevTipKutu[4] erişilebilir işlev kümesidir. Boş/geçersizse eski
         # davranış: TÜM işlevler derlenir. Erişilebilir değilse gövdeyi atla.
@@ -1138,14 +1142,14 @@ son
 # donanım semantiği) — negatif değerlerde bu YANLIŞ bayt verir. Bu yüzden
 # tabanBol256 KENDİ taban (floor) bölmesini elle hesaplıyor.
 
-işlev tabanBol256(v)
+işlev tabanBol256(v):
     eğer v >= 0 ise
         döndür tamBol(v, 256)
     son
     döndür 0 - tamBol((0 - v) + 255, 256)
 son
 
-işlev tamdanBaytlar(v, sayisi)
+işlev tamdanBaytlar(v, sayisi):
     sonuc = []
     kalan = v
     i = 0
@@ -1182,11 +1186,11 @@ son
 # SONUNDAKİ "baytListesiBirlestir(b, kodBaytlari)" çağrısıydı: kodBaytlari
 # (TancElf kendini derlerken ~90 KB) TEK bir çağrıyla, eski ekle()-kopyalayan
 # listeBirlestir deseniyle ekleniyordu — O(|kodBaytlari|²).
-işlev baytTamponOlustur()
+işlev baytTamponOlustur():
     döndür [listeYap(64, 0)]
 son
 
-işlev baytTamponEkle(tamponKutu, nKutu, deger)
+işlev baytTamponEkle(tamponKutu, nKutu, deger):
     liste = tamponKutu[0]
     n = nKutu[0]
     kap = uzunluk(liste)
@@ -1209,14 +1213,14 @@ işlev baytTamponEkle(tamponKutu, nKutu, deger)
     döndür 0
 son
 
-işlev baytTamponEkleTumu(tamponKutu, nKutu, digerListe)
+işlev baytTamponEkleTumu(tamponKutu, nKutu, digerListe):
     her x digerListe içinde
         z = baytTamponEkle(tamponKutu, nKutu, x)
     son
     döndür 0
 son
 
-işlev baytTamponSonuc(tamponKutu, nKutu)
+işlev baytTamponSonuc(tamponKutu, nKutu):
     liste = tamponKutu[0]
     n = nKutu[0]
     sonuc = listeYap(n, 0)
@@ -1228,7 +1232,7 @@ işlev baytTamponSonuc(tamponKutu, nKutu)
     döndür sonuc
 son
 
-işlev baytListesiBirlestir(a, b)
+işlev baytListesiBirlestir(a, b):
     tk = baytTamponOlustur()
     nk = [0]
     z = baytTamponEkleTumu(tk, nk, a)
@@ -1236,17 +1240,17 @@ işlev baytListesiBirlestir(a, b)
     döndür baytTamponSonuc(tk, nk)
 son
 
-işlev kodEkleN(kod, v, n)
+işlev kodEkleN(kod, v, n):
     döndür baytListesiBirlestir(kod, tamdanBaytlar(v, n))
 son
 
 # ModRM baytı: mod(2) reg(3) rm(3). Alanlar bit-ayrık olduğundan toplama
 # bitwise OR ile aynı sonucu verir (reg/rm daima 0-11 arası, negatif değil).
-işlev modrmBayt(mod, reg, rm)
+işlev modrmBayt(mod, reg, rm):
     döndür mod * 64 + (reg % 8) * 8 + (rm % 8)
 son
 
-işlev metneTamSayi(s)
+işlev metneTamSayi(s):
     # ÖNCEDEN "s[i]" (ham indeksleme) kullanıyordu — s PARAMETRE olduğundan
     # tipi hep "tam" sanılıyordu, indeksleme metin baytı yerine YANLIŞ bir
     # değer (gözlemlenen: doğrudan bayt kodu, metin işaretçisi DEĞİL)
@@ -1277,7 +1281,7 @@ son
 # Sınır: ~15 anlamlı basamak (M int64'e sığmalı) ve normal double aralığı
 # (2^-1022'den küçük değerler subnormal — gerçek literal'lerde asla oluşmaz).
 
-işlev guc2(k)
+işlev guc2(k):
     g = 1
     j = 0
     iken j < k
@@ -1289,7 +1293,7 @@ son
 
 # kesirBit: k/olcek'in fi'inci ikili biti (fi=1 -> 2^-1). Uzun bölme:
 # bit_i = tamBol(f*2, olcek) OLMADAN önce, kalan f = (f*2) mod olcek.
-işlev kesirBit(k, olcek, fi)
+işlev kesirBit(k, olcek, fi):
     f = k
     j = 0
     bit = 0
@@ -1304,7 +1308,7 @@ son
 
 # kesirKalan: fi bit çıkarıldıktan SONRAKI kuyruk (f) — yuvarlama sticky'si.
 # f != 0 ise aşağıda en az bir 1 daha var demektir.
-işlev kesirKalan(k, olcek, n)
+işlev kesirKalan(k, olcek, n):
     f = k
     j = 0
     iken j < n
@@ -1315,7 +1319,7 @@ işlev kesirKalan(k, olcek, n)
     döndür f
 son
 
-işlev kesirBits(s)
+işlev kesirBits(s):
     n = uzunluk(s)
     M = 0
     F = 0
@@ -1411,17 +1415,17 @@ son
 # karşılığı — deyimler (Bölüm sonrası) doğrudan bu bandı özyinelemeli
 # üretecek, RPN'den AYRI bir ikinci düzeltme sistemi DEĞİL.
 
-işlev bcBayt(n)
+işlev bcBayt(n):
     döndür bc("BAYT", metin(n), "")
 son
-işlev bcEtiket(ad)
+işlev bcEtiket(ad):
     döndür bc("ETIKET", ad, "")
 son
-işlev bcRel32(ad)
+işlev bcRel32(ad):
     döndür bc("REL32", ad, "")
 son
 
-işlev baytlarBant(baytlar)
+işlev baytlarBant(baytlar):
     bant = []
     her b baytlar içinde
         bant = ekle(bant, bcBayt(b))
@@ -1429,11 +1433,11 @@ işlev baytlarBant(baytlar)
     döndür bant
 son
 
-işlev nBant(v, sayisi)
+işlev nBant(v, sayisi):
     döndür baytlarBant(tamdanBaytlar(v, sayisi))
 son
 
-işlev pushKayit(r)
+işlev pushKayit(r):
     bant = []
     eğer r >= 8 ise
         bant = ekle(bant, bcBayt(65)) # 0x41 REX.B
@@ -1441,7 +1445,7 @@ işlev pushKayit(r)
     döndür ekle(bant, bcBayt(80 + (r % 8))) # 0x50+r
 son
 
-işlev popKayit(r)
+işlev popKayit(r):
     bant = []
     eğer r >= 8 ise
         bant = ekle(bant, bcBayt(65))
@@ -1450,7 +1454,7 @@ işlev popKayit(r)
 son
 
 # mov r64, imm64 (movabs) — REX.W B8+rd imm64
-işlev movImm64(r, v)
+işlev movImm64(r, v):
     rex = 72 # 0x48
     eğer r >= 8 ise
         rex = rex + 1
@@ -1460,7 +1464,7 @@ işlev movImm64(r, v)
 son
 
 # mov r64, imm32 (işaretli genişletme) — REX.W C7 /0 id
-işlev movImm32(r, v)
+işlev movImm32(r, v):
     rex = 72
     eğer r >= 8 ise
         rex = rex + 1
@@ -1470,7 +1474,7 @@ işlev movImm32(r, v)
 son
 
 # iki kayıtlı 64-bit işlem: opkod rm, reg  (89=mov 01=add 29=sub 39=cmp 31=xor)
-işlev ikiliKayit(opkod, rm, reg)
+işlev ikiliKayit(opkod, rm, reg):
     rex = 72
     eğer reg >= 8 ise
         rex = rex + 4
@@ -1481,29 +1485,29 @@ işlev ikiliKayit(opkod, rm, reg)
     döndür [bcBayt(rex), bcBayt(opkod), bcBayt(modrmBayt(3, reg, rm))]
 son
 
-işlev movKayit(hedef, kaynak)
+işlev movKayit(hedef, kaynak):
     döndür ikiliKayit(137, hedef, kaynak) # 0x89
 son
-işlev addKayit(hedef, kaynak)
+işlev addKayit(hedef, kaynak):
     döndür ikiliKayit(1, hedef, kaynak) # 0x01
 son
-işlev subKayit(hedef, kaynak)
+işlev subKayit(hedef, kaynak):
     döndür ikiliKayit(41, hedef, kaynak) # 0x29
 son
-işlev cmpKayit(sol, sag)
+işlev cmpKayit(sol, sag):
     döndür ikiliKayit(57, sol, sag) # 0x39
 son
-işlev xorKayit(hedef, kaynak)
+işlev xorKayit(hedef, kaynak):
     döndür ikiliKayit(49, hedef, kaynak) # 0x31
 son
-işlev andKayit(hedef, kaynak)
+işlev andKayit(hedef, kaynak):
     döndür ikiliKayit(33, hedef, kaynak) # 0x21
 son
-işlev orKayit(hedef, kaynak)
+işlev orKayit(hedef, kaynak):
     döndür ikiliKayit(9, hedef, kaynak) # 0x09
 son
 # shl/shr r/m64, cl  (REX.W D3 /spec) — spec=4 shl, 5 shr; sayaç cl'de (rcx)
-işlev shiftClKayit(reg, spec)
+işlev shiftClKayit(reg, spec):
     rex = 72
     eğer reg >= 8 ise
         rex = rex + 1
@@ -1519,7 +1523,7 @@ son
 # başlar (W biti YOK), movq/cvt çiftleri 0x48'den (W biti VAR).
 
 # movq xmm<x>, r64<r>   (66 REX.W 0F 6E /r) — gpr bit desenini xmm'e taşı
-işlev movqXmmKayit(x, r)
+işlev movqXmmKayit(x, r):
     rex = 72
     eğer x >= 8 ise
         rex = rex + 4
@@ -1531,7 +1535,7 @@ işlev movqXmmKayit(x, r)
 son
 
 # movq r64<r>, xmm<x>   (66 REX.W 0F 7E /r) — sonucu GPR'e geri al
-işlev movqKayitXmm(r, x)
+işlev movqKayitXmm(r, x):
     rex = 72
     eğer x >= 8 ise
         rex = rex + 4
@@ -1543,7 +1547,7 @@ işlev movqKayitXmm(r, x)
 son
 
 # F2 0F <op> /r : addsd(58) subsd(5C) mulsd(59) divsd(5E) xmm<hedef>, xmm<kaynak>
-işlev sseIkili(op, hedef, kaynak)
+işlev sseIkili(op, hedef, kaynak):
     bant = [bcBayt(242)]
     eğer hedef >= 8 veya kaynak >= 8 ise
         rex = 64
@@ -1561,7 +1565,7 @@ işlev sseIkili(op, hedef, kaynak)
 son
 
 # cvtsi2sd xmm<x>, r64<r>   (F2 REX.W 0F 2A /r) — tam sayıyı double'a çevir
-işlev cvtTamKesir(x, r)
+işlev cvtTamKesir(x, r):
     rex = 72
     eğer x >= 8 ise
         rex = rex + 4
@@ -1573,7 +1577,7 @@ işlev cvtTamKesir(x, r)
 son
 
 # cvttsd2si r64<r>, xmm<x>   (F2 REX.W 0F 2C /r) — double'ı SIFIRA DOĞRU kes
-işlev cvtKesirTam(r, x)
+işlev cvtKesirTam(r, x):
     rex = 72
     eğer r >= 8 ise
         rex = rex + 4
@@ -1586,7 +1590,7 @@ son
 
 # comisd xmm<a>, xmm<b>   (66 [rex] 0F 2F /r) — işaretsiz bayrak kullanır
 # (ondalık karşılaştırma setcc kodları tamsayı kodlarından FARKLI).
-işlev comisd(a, b)
+işlev comisd(a, b):
     bant = [bcBayt(102)]
     eğer a >= 8 veya b >= 8 ise
         rex = 64
@@ -1604,7 +1608,7 @@ işlev comisd(a, b)
 son
 
 # imul r64, r64 (REX.W 0F AF /r)
-işlev imulKayit(hedef, kaynak)
+işlev imulKayit(hedef, kaynak):
     rex = 72
     eğer hedef >= 8 ise
         rex = rex + 4
@@ -1615,12 +1619,12 @@ işlev imulKayit(hedef, kaynak)
     döndür [bcBayt(rex), bcBayt(15), bcBayt(175), bcBayt(modrmBayt(3, hedef, kaynak))]
 son
 
-işlev cqo()
+işlev cqo():
     döndür [bcBayt(72), bcBayt(153)] # 0x48 0x99
 son
 
 # idiv r64 (F7 /7) — isaretli
-işlev idivKayit(r)
+işlev idivKayit(r):
     rex = 72
     eğer r >= 8 ise
         rex = rex + 1
@@ -1629,7 +1633,7 @@ işlev idivKayit(r)
 son
 
 # div r64 (F7 /6) — isaretsiz (yaz_sayı basamak çıkarımı için)
-işlev divKayit(r)
+işlev divKayit(r):
     rex = 72
     eğer r >= 8 ise
         rex = rex + 1
@@ -1638,7 +1642,7 @@ işlev divKayit(r)
 son
 
 # neg r64 (F7 /3)
-işlev negKayit(r)
+işlev negKayit(r):
     rex = 72
     eğer r >= 8 ise
         rex = rex + 1
@@ -1647,7 +1651,7 @@ işlev negKayit(r)
 son
 
 # dec r64 (FF /1)
-işlev decKayit(r)
+işlev decKayit(r):
     rex = 72
     eğer r >= 8 ise
         rex = rex + 1
@@ -1656,7 +1660,7 @@ işlev decKayit(r)
 son
 
 # cmp r64, imm32 (81 /7)
-işlev cmpImm32(r, v)
+işlev cmpImm32(r, v):
     rex = 72
     eğer r >= 8 ise
         rex = rex + 1
@@ -1666,7 +1670,7 @@ işlev cmpImm32(r, v)
 son
 
 # sub r64, imm32 (81 /5) — rsp'yi azaltmak için (subImm32(4, n) = sub rsp,n)
-işlev subImm32(r, v)
+işlev subImm32(r, v):
     rex = 72
     eğer r >= 8 ise
         rex = rex + 1
@@ -1676,7 +1680,7 @@ işlev subImm32(r, v)
 son
 
 # mov [rbp+disp32], r64 (89 /r, mod=2)
-işlev movYerelYaz(disp, kaynak)
+işlev movYerelYaz(disp, kaynak):
     rex = 72
     eğer kaynak >= 8 ise
         rex = rex + 4
@@ -1686,7 +1690,7 @@ işlev movYerelYaz(disp, kaynak)
 son
 
 # mov r64, [rbp+disp32] (8B /r, mod=2)
-işlev movYerelOku(hedef, disp)
+işlev movYerelOku(hedef, disp):
     rex = 72
     eğer hedef >= 8 ise
         rex = rex + 4
@@ -1696,7 +1700,7 @@ işlev movYerelOku(hedef, disp)
 son
 
 # lea r64, [rbp+disp8] (8D /r, mod=1) — disp8 -128..127 aralığında olmalı
-işlev leaRbp(hedef, disp)
+işlev leaRbp(hedef, disp):
     rex = 72
     eğer hedef >= 8 ise
         rex = rex + 4
@@ -1715,7 +1719,7 @@ son
 # mod=0 (disp yok) kodlama güvenli.
 
 # mov hedef, [taban]  (8B /r, mod=0, disp yok)
-işlev movPtrOku(hedef, taban)
+işlev movPtrOku(hedef, taban):
     rex = 72
     eğer hedef >= 8 ise
         rex = rex + 4
@@ -1727,7 +1731,7 @@ işlev movPtrOku(hedef, taban)
 son
 
 # mov [taban], kaynak  (89 /r, mod=0, disp yok)
-işlev movPtrYaz(taban, kaynak)
+işlev movPtrYaz(taban, kaynak):
     rex = 72
     eğer kaynak >= 8 ise
         rex = rex + 4
@@ -1747,7 +1751,7 @@ son
 # yerine, callee-saved register kırılganlığını gidermek için) burayı kullanır.
 
 # lea hedef, [rip+disp32]
-işlev leaVeri(hedef, etiket)
+işlev leaVeri(hedef, etiket):
     rex = 72
     eğer hedef >= 8 ise
         rex = rex + 4
@@ -1756,7 +1760,7 @@ işlev leaVeri(hedef, etiket)
 son
 
 # mov hedef, [rip+disp32]
-işlev movGenelOku(hedef, etiket)
+işlev movGenelOku(hedef, etiket):
     rex = 72
     eğer hedef >= 8 ise
         rex = rex + 4
@@ -1765,7 +1769,7 @@ işlev movGenelOku(hedef, etiket)
 son
 
 # mov [rip+disp32], kaynak
-işlev movGenelYaz(etiket, kaynak)
+işlev movGenelYaz(etiket, kaynak):
     rex = 72
     eğer kaynak >= 8 ise
         rex = rex + 4
@@ -1776,7 +1780,7 @@ son
 # veriAyir: etiket + N sıfır bayt (mutasyona uğrayabilir global değişken
 # yuvası — string literalleri için değil, v_yigin/v_yiginSon gibi
 # okunup-yazılan tekil global slotlar için).
-işlev veriAyir(etiket, bayt)
+işlev veriAyir(etiket, bayt):
     b = [bcEtiket(etiket)]
     i = 0
     iken i < bayt
@@ -1789,7 +1793,7 @@ son
 # lea hedef, [taban + indeks*8 + 8]  (8D /r, mod=1, SIB, disp8=8 sabit) —
 # liste düzeni [uzunluk:8][öge0:8]... olduğundan +8 baştaki uzunluk alanını
 # atlıyor. DerleElf.go leaOge ile birebir aynı kodlama.
-işlev leaOge(hedef, taban, indeks)
+işlev leaOge(hedef, taban, indeks):
     rex = 72
     eğer hedef >= 8 ise
         rex = rex + 4
@@ -1805,7 +1809,7 @@ işlev leaOge(hedef, taban, indeks)
 son
 
 # lea hedef, [taban+disp8]  (8D /r, mod=1) — taban ASLA rsp/rbp/r12/r13 değil
-işlev leaDolayli(hedef, taban, disp)
+işlev leaDolayli(hedef, taban, disp):
     rex = 72
     eğer hedef >= 8 ise
         rex = rex + 4
@@ -1824,7 +1828,7 @@ son
 # lock cmpxchg [taban], kaynak (F0 REX 0F B1 /r) — CPU RAX'i implicit
 # karşılaştırma değeri olarak kullanır: [taban]==RAX ise [taban]=kaynak ve
 # ZF=1; değilse RAX=[taban] (GÜNCEL değer) ve ZF=0. Atomik CAS.
-işlev lockCmpxchgBellek(taban, kaynak)
+işlev lockCmpxchgBellek(taban, kaynak):
     rex = 72
     eğer kaynak >= 8 ise
         rex = rex + 4
@@ -1837,7 +1841,7 @@ son
 
 # lock xadd [taban], kaynakHedef (F0 REX 0F C1 /r) — [taban]+=kaynakHedef
 # (atomik); kaynakHedef = [taban]'ın ESKİ değeri. Atomik fetch-and-add.
-işlev lockXaddBellek(taban, kaynakHedef)
+işlev lockXaddBellek(taban, kaynakHedef):
     rex = 72
     eğer kaynakHedef >= 8 ise
         rex = rex + 4
@@ -1852,7 +1856,7 @@ son
 # leaDolayli ile AYNI ModRM deseni (opcode 0x8D yerine 0x8B). İplik-blok
 # argüman aktarım alanına (+16, +16+8, ...) erişim için gerekli. taban
 # ASLA rsp/rbp/r12/r13 değil (leaDolayli'deki AYNI kısıt).
-işlev movDolayliOku(hedef, taban, disp)
+işlev movDolayliOku(hedef, taban, disp):
     rex = 72
     eğer hedef >= 8 ise
         rex = rex + 4
@@ -1868,7 +1872,7 @@ işlev movDolayliOku(hedef, taban, disp)
 son
 
 # mov [taban+disp8], kaynak (89 /r, mod=1) — movPtrYaz'ın disp8'li hali.
-işlev movDolayliYaz(taban, disp, kaynak)
+işlev movDolayliYaz(taban, disp, kaynak):
     rex = 72
     eğer kaynak >= 8 ise
         rex = rex + 4
@@ -1884,7 +1888,7 @@ işlev movDolayliYaz(taban, disp, kaynak)
 son
 
 # shl r64, imm8 (C1 /4)
-işlev shlImm(r, v)
+işlev shlImm(r, v):
     rex = 72
     eğer r >= 8 ise
         rex = rex + 1
@@ -1893,7 +1897,7 @@ işlev shlImm(r, v)
 son
 
 # inc r64 (FF /0)
-işlev incKayit(r)
+işlev incKayit(r):
     rex = 72
     eğer r >= 8 ise
         rex = rex + 1
@@ -1902,12 +1906,12 @@ işlev incKayit(r)
 son
 
 # test r64, r64 (85 /r) — ikiliKayit(0x85, rm, reg) ile aynı kodlama
-işlev testKayit(a, b)
+işlev testKayit(a, b):
     döndür ikiliKayit(133, a, b)
 son
 
 # add r64, imm32 (81 /0)
-işlev addImm32(r, v)
+işlev addImm32(r, v):
     rex = 72
     eğer r >= 8 ise
         rex = rex + 1
@@ -1917,7 +1921,7 @@ işlev addImm32(r, v)
 son
 
 # and r64, imm32 (81 /4)
-işlev andImm32(r, v)
+işlev andImm32(r, v):
     rex = 72
     eğer r >= 8 ise
         rex = rex + 1
@@ -1927,12 +1931,12 @@ işlev andImm32(r, v)
 son
 
 # push imm32 (68 id)
-işlev pushImm32(v)
+işlev pushImm32(v):
     döndür listeBirlestir([bcBayt(104)], nBant(v, 4))
 son
 
 # mov hedef, [rsp+disp8]  (48 8B /r 24 disp8) — rsp taban SIB zorunlu kılar
-işlev movRspOku(hedef, disp)
+işlev movRspOku(hedef, disp):
     rex = 72
     eğer hedef >= 8 ise
         rex = rex + 4
@@ -1945,57 +1949,57 @@ işlev movRspOku(hedef, disp)
 son
 
 # inc qword [rsp]  (48 FF /0 24)
-işlev incRspSifir()
+işlev incRspSifir():
     döndür [bcBayt(72), bcBayt(255), bcBayt(modrmBayt(0, 0, 4)), bcBayt(36)]
 son
 
 # mov al, [taban]  (8A /r, mod=0) — taban rsi/rdi gibi <8 register olmalı
-işlev movBaytOku(taban)
+işlev movBaytOku(taban):
     döndür [bcBayt(138), bcBayt(modrmBayt(0, 0, taban))]
 son
 
 # mov byte [r], imm8 (C6 /0)
-işlev movBaytImm(r, v)
+işlev movBaytImm(r, v):
     döndür [bcBayt(198), bcBayt(modrmBayt(0, 0, r)), bcBayt(v)]
 son
 
 # mov [rm], reg8 (88 /r)
-işlev movBaytKayit(rmR, regR)
+işlev movBaytKayit(rmR, regR):
     döndür [bcBayt(136), bcBayt(modrmBayt(0, regR, rmR))]
 son
 
 # add byte [r], imm8 (80 /0)
-işlev addBaytImm(r, v)
+işlev addBaytImm(r, v):
     döndür [bcBayt(128), bcBayt(modrmBayt(3, 0, r)), bcBayt(v)]
 son
 
-işlev jmpBant(etiket)
+işlev jmpBant(etiket):
     döndür [bcBayt(233), bcRel32(etiket)] # 0xE9 rel32
 son
 
 # jcc rel32 (0F 8x). kod: 0x84=je 0x85=jne 0x8D=jge
-işlev jccBant(kod, etiket)
+işlev jccBant(kod, etiket):
     döndür [bcBayt(15), bcBayt(kod), bcRel32(etiket)]
 son
 
-işlev callBant(etiket)
+işlev callBant(etiket):
     döndür [bcBayt(232), bcRel32(etiket)] # 0xE8 rel32
 son
 
-işlev retBant()
+işlev retBant():
     döndür [bcBayt(195)] # 0xC3
 son
 
-işlev leaveBant()
+işlev leaveBant():
     döndür [bcBayt(201)] # 0xC9
 son
 
-işlev syscallEmit()
+işlev syscallEmit():
     döndür [bcBayt(15), bcBayt(5)] # 0x0F 0x05
 son
 
 # etiketBul: (etikAdlari, etikKonumlari) paralel düz listelerinde doğrusal arama
-işlev etiketBul(ad, etikAdlari, etikKonumlari)
+işlev etiketBul(ad, etikAdlari, etikKonumlari):
     n = uzunluk(etikAdlari)
     i = 0
     iken i < n
@@ -2012,7 +2016,7 @@ son
 # (hedefKonum - (buradaKonum+4)) ile doldur. Tek fonksiyon, tek geçiş
 # çifti — DÖNGÜSEL DEĞİL (özyineli parçalar değil), bu yüzden global/kutu
 # sorunu yok, sıradan yerel listelerle çalışır.
-işlev bagla(bant)
+işlev bagla(bant):
     n = uzunluk(bant)
     etikAdlariKutu = tamponOlustur()
     etikAdlariNKutu = [0]
@@ -2068,7 +2072,7 @@ son
 # metne çevirir. Bu ancak elf arka ucunun karakter()/metin-birleştirme
 # RUNE değil BAYT bazlı çalışması sayesinde doğru (doğrulandı: karakter(200)
 # tek bir 0xC8 baytı üretiyor, 2 baytlık UTF-8 kodlaması değil).
-işlev baytListesindenMetin(baytlar)
+işlev baytListesindenMetin(baytlar):
     s = ""
     her b baytlar içinde
         s = s + karakter(b)
@@ -2086,7 +2090,7 @@ son
 # aksi halde her çağrı TÜM listeyi kopyalar (O(n²) — bagla()'nın kaçındığı
 # tuzağın aynısı, ilk denemede TancElf.tan'ın kendi derlemesinde SONSUZ
 # YAVAŞLIĞA yol açtığı doğrulandı, geri alınıp tampon deseniyle düzeltildi).
-işlev nullSonluMetinEkle(liste, s)
+işlev nullSonluMetinEkle(liste, s):
     j = 0
     n = uzunluk(s)
     iken j < n
@@ -2098,7 +2102,7 @@ işlev nullSonluMetinEkle(liste, s)
 son
 
 # ASCII metnin baytlarını (+ null sonlandırıcı) bir baytTampon'a ekler — O(1) amortize.
-işlev nullSonluMetinEkleTampon(tamponKutu, nKutu, s)
+işlev nullSonluMetinEkleTampon(tamponKutu, nKutu, s):
     j = 0
     n = uzunluk(s)
     iken j < n
@@ -2110,13 +2114,13 @@ işlev nullSonluMetinEkleTampon(tamponKutu, nKutu, s)
 son
 
 # v sayısını n baytlık küçük-uçlu olarak bir baytTampon'a ekler — O(1) amortize.
-işlev tamponKodEkleN(tamponKutu, nKutu, v, n)
+işlev tamponKodEkleN(tamponKutu, nKutu, v, n):
     z = baytTamponEkleTumu(tamponKutu, nKutu, tamdanBaytlar(v, n))
     döndür 0
 son
 
 # ULEB128 kodla (v >= 0) — DWARF .debug_line program operandları için.
-işlev uleb128Kodla(v)
+işlev uleb128Kodla(v):
     baytlar = []
     surdur = 1
     iken surdur == 1
@@ -2136,7 +2140,7 @@ son
 # DW_LNS_advance_line hep artan/eşit satır numarası görüyor, kaynak
 # tokenleri LİNEER işlendiği için satır asla GERİ gitmiyor — negatif dal
 # kasıtlı olarak yazılmadı, spec'in pozitif-sayı kuralına tam uyar).
-işlev sleb128Kodla(v)
+işlev sleb128Kodla(v):
     baytlar = []
     surdur = 1
     iken surdur == 1
@@ -2152,7 +2156,7 @@ işlev sleb128Kodla(v)
     döndür baytlar
 son
 
-işlev elfUret(kodBaytlari, girisOfsetKodIci, etikAdlari, etikKonumlari, dwarfBilgisi)
+işlev elfUret(kodBaytlari, girisOfsetKodIci, etikAdlari, etikKonumlari, dwarfBilgisi):
     # dwarfBilgisi = [satirOfsetleri, satirNolari, kaynakDosyaAdi] — TEK
     # parametre içinde paketlendi (6-parametre ABI sınırı, bkz. Madde 9
     # notu / satirHaritasi'nın aynı sebeple islevTipKutu'ya paketlenmesi).
@@ -2478,7 +2482,7 @@ son
 # talimat sırası — rdi=sayı alır, ondalık metne çevirip stdout'a write
 # syscall'ıyla yazar. Döngü + etiketli dallanma içerir (bagla()'nın asıl
 # kanıtı burada: Ldongu geriye atlıyor, rel32 NEGATİF olmalı).
-işlev yazSayiBant()
+işlev yazSayiBant():
     b = [bcEtiket("yaz_sayi")]
     b = listeBirlestir(b, pushKayit(5))         # push rbp
     b = listeBirlestir(b, movKayit(5, 4))       # mov rbp, rsp
@@ -2538,7 +2542,7 @@ son
 # bağımlı olduğu için kod üretim hatası gibi görünüyordu. v_yiginSon =
 # geçerli yığın sınırı; aşılırsa brk ile 64 MB daha istenir, brk başarısız
 # olursa sessizce bozulmak yerine exit(3).
-işlev yiginIlkleBant()
+işlev yiginIlkleBant():
     b = movImm32(0, 12)                    # rax = 12 (sys_brk)
     b = listeBirlestir(b, xorKayit(7, 7))  # rdi = 0
     b = listeBirlestir(b, syscallEmit())
@@ -2553,7 +2557,7 @@ işlev yiginIlkleBant()
 son
 
 # tan_ayir(rdi=bayt) -> rax=işaretçi  (8'e hizalı bump allocator)
-işlev tanAyirBant()
+işlev tanAyirBant():
     b = [bcEtiket("f_tan_ayir")]
     b = listeBirlestir(b, addImm32(7, 7))     # rdi += 7
     b = listeBirlestir(b, andImm32(7, 0 - 8)) # rdi &= -8 (8'e hizala)
@@ -2592,7 +2596,7 @@ işlev tanAyirBant()
 son
 
 # bellek_kopyala(rdi=hedef, rsi=kaynak, rdx=adet) — bayt bayt kopyalar
-işlev bellekKopyalaBant()
+işlev bellekKopyalaBant():
     b = [bcEtiket("f_bellek_kopyala")]
     b = listeBirlestir(b, testKayit(2, 2))
     b = listeBirlestir(b, jccBant(132, "Lkopya_son"))   # je
@@ -2610,7 +2614,7 @@ son
 # liste_ekle(rdi=liste, rsi=öge) -> rax=YENİ liste (kopya, DOKUMANTASYON.md
 # semantiği: ekle() asla yerinde değiştirmez). DerleElf.go yardimciListeEkle
 # ile birebir aynı adım sırası.
-işlev listeEkleBant()
+işlev listeEkleBant():
     b = [bcEtiket("f_liste_ekle")]
     b = listeBirlestir(b, pushKayit(5))          # push rbp
     b = listeBirlestir(b, movKayit(5, 4))        # mov rbp, rsp
@@ -2651,7 +2655,7 @@ son
 # ekle ile yapıldığında bu O(n²) desen kendi kendini derlerken WSL'i
 # çökertecek kadar bellek istiyordu (bkz. SURUM.md). listeYap, Tampon.tan
 # desenindeki (bkz. tamponEkle) büyüyen tamponun temel taşı.
-işlev listeYapBant()
+işlev listeYapBant():
     b = [bcEtiket("f_liste_yap")]
     b = listeBirlestir(b, pushKayit(5))
     b = listeBirlestir(b, movKayit(5, 4))
@@ -2695,7 +2699,7 @@ son
 
 # metinVerisiBant: bir metin DEĞERİNİ [uzunluk:8][baytlar...] ham veri
 # bandına çevirir (leaVeri ile işaretlenen etiketin ALTINA gömülür).
-işlev metinVerisiBant(deger)
+işlev metinVerisiBant(deger):
     # ÖNCEDEN "deger[i]" (ham indeksleme) — deger PARAMETRE olduğundan tipi
     # "tam" sanılıyordu, aynı metneTamSayi/alan hatası (metinEsit ailesi).
     n = uzunluk(deger)
@@ -2724,7 +2728,7 @@ son
 # deseni TAMAMEN ELİYOR: 1. geçiş basamak SAYAR (yazmadan), doğru boyutta
 # HEAP ayrılır, 2. geçiş basamakları DOĞRUDAN heap tamponuna yazar — ara
 # stack tamponu ve f_bellek_kopyala çağrısı hiç yok.
-işlev sayiMetneBant()
+işlev sayiMetneBant():
     b = [bcEtiket("f_sayi_metne")]
     b = listeBirlestir(b, pushKayit(5))         # push rbp
     b = listeBirlestir(b, movKayit(5, 4))       # mov rbp, rsp
@@ -2802,7 +2806,7 @@ son
 # f_bellek_kopyala rdi/rsi'yi KENDİ İÇİNDE ilerlettiği için (incKayit her
 # baytta) B'nin kopyalanacağı nokta A'dan SONRA otomatik doğru yerde —
 # aradan ayrı bir toplama gerekmiyor.
-işlev metinBirlestirBant()
+işlev metinBirlestirBant():
     b = [bcEtiket("f_metin_birlestir")]
     b = listeBirlestir(b, pushKayit(5))
     b = listeBirlestir(b, movKayit(5, 4))
@@ -2839,10 +2843,78 @@ işlev metinBirlestirBant()
     döndür listeBirlestir(b, retBant())
 son
 
+# metin_dilim(rdi=s, rsi=bas, rdx=hedefUzunluk) -> rax=YENİ metin, TEK
+# allocate + TEK bellek_kopyala (O(hedefUzunluk)). walIcerikNormalize/
+# walAltMetin/pmSayfaOku/pmSayfaYaz'daki "PAGE_SIZE'a kadar TEK KARAKTER
+# metinBirlestir döngüsü" deseninin yerine — o desen GC'siz arende (bkz.
+# tanAyirBant) her sayfa işleminde O(n²) hem zaman hem KALICI sızıntı
+# üretiyordu (VETA WAL crash-gate denetimi, 2026-09-08: 9 kayıtlık WAL'da
+# birkaç saniyede 3.4GB RSS, OOM-kill + bir kez WSL çöktü).
+#
+# s'den [bas, bas+kopyalanacak) kopyalanır, kopyalanacak =
+# min(hedefUzunluk, uzunluk(s)-bas) (negatifse 0'a kırpılır — kısa kaynak
+# durumu). Kalan (hedefUzunluk-kopyalanacak) bayt YAZILMAZ: f_tan_ayir
+# saf bump allocator (reuse/free YOK, bkz. tanAyirBant), yeni bellek
+# Linux brk() garantisiyle HER ZAMAN sıfır geliyor — ayrı dolgu döngüsü
+# gereksiz. BU BİR İNVARYANT: tanAyirBant'a free/reuse eklenirse (arena
+# borcu kapatılırsa) bu varsayım da gözden geçirilmeli.
+işlev metinDilimBant():
+    b = [bcEtiket("f_metin_dilim")]
+    b = listeBirlestir(b, pushKayit(5))
+    b = listeBirlestir(b, movKayit(5, 4))
+    b = listeBirlestir(b, subImm32(4, 64))
+    b = listeBirlestir(b, movYerelYaz(0 - 8, 7))     # [-8] = s
+    b = listeBirlestir(b, movYerelYaz(0 - 16, 6))    # [-16] = bas
+    b = listeBirlestir(b, movYerelYaz(0 - 24, 2))    # [-24] = hedefUzunluk
+
+    # kalanKaynak = uzunluk(s) - bas, negatifse 0'a kirp
+    b = listeBirlestir(b, movYerelOku(7, 0 - 8))
+    b = listeBirlestir(b, movPtrOku(0, 7))           # rax = uzunluk(s)
+    b = listeBirlestir(b, movYerelOku(1, 0 - 16))    # rcx = bas
+    b = listeBirlestir(b, subKayit(0, 1))            # rax -= bas
+    b = listeBirlestir(b, cmpImm32(0, 0))
+    b = listeBirlestir(b, jccBant(141, "Lmd_klamp1")) # jge -> zaten >=0
+    b = listeBirlestir(b, xorKayit(0, 0))
+    b = ekle(b, bcEtiket("Lmd_klamp1"))
+
+    # kopyalanacak = min(kalanKaynak, hedefUzunluk)
+    b = listeBirlestir(b, movYerelOku(1, 0 - 24))    # rcx = hedefUzunluk
+    b = listeBirlestir(b, cmpKayit(0, 1))
+    b = listeBirlestir(b, jccBant(142, "Lmd_klamp2")) # jle -> kalanKaynak<=hedef, rax dogru
+    b = listeBirlestir(b, movKayit(0, 1))            # rax = hedefUzunluk (kirp)
+    b = ekle(b, bcEtiket("Lmd_klamp2"))
+    b = listeBirlestir(b, movYerelYaz(0 - 32, 0))    # [-32] = kopyalanacak
+
+    # yeni = tan_ayir(hedefUzunluk + 8)
+    b = listeBirlestir(b, movYerelOku(7, 0 - 24))
+    b = listeBirlestir(b, addImm32(7, 8))
+    b = listeBirlestir(b, callBant("f_tan_ayir"))    # rax = yeni
+    b = listeBirlestir(b, movYerelYaz(0 - 40, 0))    # [-40] = yeni
+
+    # yeni.uzunluk = hedefUzunluk
+    b = listeBirlestir(b, movYerelOku(0, 0 - 40))
+    b = listeBirlestir(b, movYerelOku(1, 0 - 24))
+    b = listeBirlestir(b, movPtrYaz(0, 1))
+
+    # bellek_kopyala(dest=yeni+8, src=s+8+bas, len=kopyalanacak)
+    b = listeBirlestir(b, movYerelOku(7, 0 - 40))
+    b = listeBirlestir(b, addImm32(7, 8))            # rdi = yeni+8
+    b = listeBirlestir(b, movYerelOku(6, 0 - 8))     # rsi = s
+    b = listeBirlestir(b, addImm32(6, 8))            # rsi = s+8
+    b = listeBirlestir(b, movYerelOku(1, 0 - 16))    # rcx = bas
+    b = listeBirlestir(b, addKayit(6, 1))            # rsi = s+8+bas
+    b = listeBirlestir(b, movYerelOku(2, 0 - 32))    # rdx = kopyalanacak
+    b = listeBirlestir(b, callBant("f_bellek_kopyala"))
+
+    b = listeBirlestir(b, movYerelOku(0, 0 - 40))    # rax = yeni (dönüş)
+    b = listeBirlestir(b, leaveBant())
+    döndür listeBirlestir(b, retBant())
+son
+
 # metin_esit(rdi=metinA, rsi=metinB) -> rax=1 (aynı içerik) / 0 (farklı).
 # BAYT BAZLI karşılaştırma — ham gösterici DEĞİL (DerleElf.go'da bulunan
 # "metin==metin pointer karşılaştırıyordu" hatasının aynısına düşme).
-işlev metinEsitBant()
+işlev metinEsitBant():
     b = [bcEtiket("f_metin_esit")]
     b = listeBirlestir(b, movPtrOku(8, 7))      # r8 = uzunlukA (SAYAÇ)
     b = listeBirlestir(b, movPtrOku(1, 6))      # rcx = uzunlukB
@@ -2874,7 +2946,7 @@ işlev metinEsitBant()
 son
 
 # metin_indeks(rdi=metin, rsi=indeks) -> rax=YENİ tek-baytlık metin
-işlev metinIndeksBant()
+işlev metinIndeksBant():
     b = [bcEtiket("f_metin_indeks")]
     b = listeBirlestir(b, pushKayit(5))
     b = listeBirlestir(b, movKayit(5, 4))
@@ -2896,7 +2968,7 @@ işlev metinIndeksBant()
 son
 
 # kod(rdi=metin) -> rax = ilk baytın kodu (BAYT bazlı, bkz. bölüm başlığı)
-işlev kodBant()
+işlev kodBant():
     b = [bcEtiket("f_kod")]
     b = listeBirlestir(b, leaDolayli(0, 7, 8))  # rax = metin+8
     b = listeBirlestir(b, movBaytOku(0))        # al = *rax
@@ -2905,7 +2977,7 @@ işlev kodBant()
 son
 
 # karakter(rdi=kod) -> rax = YENİ tek-baytlık metin
-işlev karakterBant()
+işlev karakterBant():
     b = [bcEtiket("f_karakter")]
     b = listeBirlestir(b, pushKayit(5))
     b = listeBirlestir(b, movKayit(5, 4))
@@ -2925,7 +2997,7 @@ son
 # yaz_metin(rdi=metin) — ham baytları + yeni satırı stdout'a yazar. rsp/rbp
 # gibi SIB-özel register'lar movBaytImm'e taban olarak GEÇİRİLMEZ (rax
 # kullanılıyor) — bkz. Bölüm 4 "LİSTE/YIĞIN için genel dolaylı erişim" notu.
-işlev yazMetinBant()
+işlev yazMetinBant():
     b = [bcEtiket("f_yaz_metin")]
     b = listeBirlestir(b, pushKayit(5))
     b = listeBirlestir(b, movKayit(5, 4))
@@ -2956,7 +3028,7 @@ son
 # 1 artırılır (0.9999995+ kenarı — "log(e)" gibi değerlerde 6 basamağa
 # sığmayan 1000000 üretiyordu). İşaret biti rbp-56'da saklanır (Go -9223...=
 # maskesiyle; TancElf aynı maskeyi -1'u 63 kez kaydırıp üretiyor).
-işlev kesirMetneBant()
+işlev kesirMetneBant():
     b = [bcEtiket("f_kesir_metne")]
     b = listeBirlestir(b, pushKayit(5))
     b = listeBirlestir(b, movKayit(5, 4))
@@ -3086,7 +3158,7 @@ son
 
 # yaz_kesir(rdi = double bit deseni) — Go yardimciYazKesir (5216-5223) portu.
 # Çerçevesiz: f_kesir_metne -> rdi=metin -> f_yaz_metin.
-işlev yazKesirBant()
+işlev yazKesirBant():
     b = [bcEtiket("f_yaz_kesir")]
     b = listeBirlestir(b, callBant("f_kesir_metne"))
     b = listeBirlestir(b, movKayit(7, 0))
@@ -3099,7 +3171,7 @@ son
 # exit(4) yapar — SIGFPE'nin opak 136'sı yerine kontrollü çıkış (Go
 # yardimciHataSifiraBolme 2895-2904; Go veri bölümüne gömüyor, TancElf
 # kod içine gömüyor).
-işlev hataSifiraBolmeBant()
+işlev hataSifiraBolmeBant():
     b = [bcEtiket("f_hata_sifira_bolme")]
     b = listeBirlestir(b, jmpBant("Lsifir_atla"))
     b = ekle(b, bcEtiket("Lsifir_veri"))
@@ -3132,7 +3204,7 @@ son
 # özel bir CAGRI dalı gerekmiyor).
 
 # oku(rdi=yol metni) -> rax=YENİ metin (dosya içeriği)
-işlev okuBant()
+işlev okuBant():
     b = [bcEtiket("f_oku")]
     b = listeBirlestir(b, pushKayit(5))
     b = listeBirlestir(b, movKayit(5, 4))
@@ -3181,7 +3253,7 @@ son
 
 # zaman() -> monoton saat, nanosaniye (clock_gettime CLOCK_MONOTONIC).
 # Profiling/benchmark için. tv_sec*1e9 + tv_nsec.
-işlev zamanBant()
+işlev zamanBant():
     b = [bcEtiket("f_zaman")]
     b = listeBirlestir(b, pushKayit(5))
     b = listeBirlestir(b, movKayit(5, 4))
@@ -3201,7 +3273,7 @@ son
 
 # yazHam(metin) -> stdout'a YENİ SATIR EKLEMEDEN yazar. LSP çerçeveleme
 # (Content-Length + gövde) ve ham çıktı için (yaz() daima \n ekler).
-işlev yazHamBant()
+işlev yazHamBant():
     b = [bcEtiket("f_yazHam")]
     b = listeBirlestir(b, pushKayit(5))
     b = listeBirlestir(b, movKayit(5, 4))
@@ -3217,7 +3289,7 @@ son
 
 # yazDosya(rdi=yol, rsi=içerik) -> dosyayı oluşturup içeriği yazar (0=başarı).
 # open(O_WRONLY|O_CREAT|O_TRUNC, 0644) + write + close. Cache/lockfile için.
-işlev yazDosyaBant()
+işlev yazDosyaBant():
     b = [bcEtiket("f_yazDosya")]
     b = listeBirlestir(b, pushKayit(5))
     b = listeBirlestir(b, movKayit(5, 4))
@@ -3261,7 +3333,7 @@ son
 # script'i yazmak için (bkz. K4: TLS'i elle yazmak yerine sistemin kendi
 # curl/OpenSSL'ini subprocess olarak çağırmak — kripto burada YOK, sadece
 # dosya izni farkı).
-işlev yazDosyaCalistirilabilirBant()
+işlev yazDosyaCalistirilabilirBant():
     b = [bcEtiket("f_yazDosyaCalistirilabilir")]
     b = listeBirlestir(b, pushKayit(5))
     b = listeBirlestir(b, movKayit(5, 4))
@@ -3301,7 +3373,7 @@ işlev yazDosyaCalistirilabilirBant()
 son
 
 # girdiOku() -> stdin'in tamamını metin olarak okur (fd 0). LSP/pipe/filter için.
-işlev girdiOkuBant()
+işlev girdiOkuBant():
     b = [bcEtiket("f_girdiOku")]
     b = listeBirlestir(b, pushKayit(5))
     b = listeBirlestir(b, movKayit(5, 4))
@@ -3324,7 +3396,7 @@ son
 
 # girdiOkuN(rdi=n) -> stdin'den EN FAZLA n bayt okur (tek read syscall). LSP
 # çerçeveleme (header bayt-bayt, sonra N-bayt gövde) için. Kısmi dönebilir.
-işlev girdiOkuNBant()
+işlev girdiOkuNBant():
     b = [bcEtiket("f_girdiOkuN")]
     b = listeBirlestir(b, pushKayit(5))
     b = listeBirlestir(b, movKayit(5, 4))
@@ -3348,7 +3420,7 @@ son
 
 # ---- TCP soket yerleşikleri (Kaldıraç 4: uzak registry — plain TCP) ----
 # soketAc() -> socket(AF_INET, SOCK_STREAM, 0) = fd
-işlev soketAcBant()
+işlev soketAcBant():
     b = [bcEtiket("f_soketAc")]
     b = listeBirlestir(b, movImm32(7, 2))        # rdi = AF_INET
     b = listeBirlestir(b, movImm32(6, 1))        # rsi = SOCK_STREAM
@@ -3359,7 +3431,7 @@ işlev soketAcBant()
 son
 
 # soketBagla(rdi=fd, rsi=sockaddr16 metni) -> connect sonucu
-işlev soketBaglaBant()
+işlev soketBaglaBant():
     b = [bcEtiket("f_soketBagla")]
     b = listeBirlestir(b, leaDolayli(6, 6, 8))   # rsi = addr+8 (bayt gövde)
     b = listeBirlestir(b, movImm32(2, 16))       # rdx = 16
@@ -3369,7 +3441,7 @@ işlev soketBaglaBant()
 son
 
 # soketYaz(rdi=fd, rsi=metin) -> write sonucu
-işlev soketYazBant()
+işlev soketYazBant():
     b = [bcEtiket("f_soketYaz")]
     b = listeBirlestir(b, movPtrOku(2, 6))       # rdx = *(metin) = uzunluk
     b = listeBirlestir(b, leaDolayli(6, 6, 8))   # rsi = metin+8
@@ -3379,7 +3451,7 @@ işlev soketYazBant()
 son
 
 # soketOku(rdi=fd, rsi=n) -> en fazla n bayt metin
-işlev soketOkuBant()
+işlev soketOkuBant():
     b = [bcEtiket("f_soketOku")]
     b = listeBirlestir(b, pushKayit(5))
     b = listeBirlestir(b, movKayit(5, 4))
@@ -3404,7 +3476,7 @@ işlev soketOkuBant()
 son
 
 # soketKapat(rdi=fd)
-işlev soketKapatBant()
+işlev soketKapatBant():
     b = [bcEtiket("f_soketKapat")]
     b = listeBirlestir(b, movImm32(0, 3))        # sys_close
     b = listeBirlestir(b, syscallEmit())
@@ -3412,7 +3484,7 @@ işlev soketKapatBant()
 son
 
 # soketDinle(rdi=fd, rsi=sockaddr16) -> bind + listen (sunucu için)
-işlev soketDinleBant()
+işlev soketDinleBant():
     b = [bcEtiket("f_soketDinle")]
     b = listeBirlestir(b, pushKayit(5))
     b = listeBirlestir(b, movKayit(5, 4))
@@ -3432,7 +3504,7 @@ işlev soketDinleBant()
 son
 
 # soketKabul(rdi=fd) -> accept, istemci fd
-işlev soketKabulBant()
+işlev soketKabulBant():
     b = [bcEtiket("f_soketKabul")]
     b = listeBirlestir(b, xorKayit(6, 6))        # rsi = 0
     b = listeBirlestir(b, xorKayit(2, 2))        # rdx = 0
@@ -3443,7 +3515,7 @@ son
 
 # ---- ptrace debugger yerleşikleri (AYRI araç için; TancElf codegen'e dokunmaz) ----
 # catal() -> fork; ebeveynde çocuk pid, çocukta 0
-işlev catalBant()
+işlev catalBant():
     b = [bcEtiket("f_catal")]
     b = listeBirlestir(b, movImm32(0, 57))       # sys_fork
     b = listeBirlestir(b, syscallEmit())
@@ -3451,7 +3523,7 @@ işlev catalBant()
 son
 
 # izle(request, pid, addr, data) -> ptrace. data (arg4) rcx'ten r10'a taşınır.
-işlev izleBant()
+işlev izleBant():
     b = [bcEtiket("f_izle")]
     b = listeBirlestir(b, movKayit(10, 1))       # r10 = rcx (data)
     b = listeBirlestir(b, movImm32(0, 101))      # sys_ptrace
@@ -3460,7 +3532,7 @@ işlev izleBant()
 son
 
 # calistir(yol) -> execve(yol, [yol,0], 0). Dönerse execve başarısız.
-işlev calistirBant()
+işlev calistirBant():
     b = [bcEtiket("f_calistir")]
     b = listeBirlestir(b, pushKayit(5))
     b = listeBirlestir(b, movKayit(5, 4))
@@ -3497,7 +3569,7 @@ son
 
 # izleRegs(pid) -> PTRACE_GETREGS, 216 baytlık register struct'ı metin döndürür.
 # orig_rax offset 120 (syscall no), rip offset 128.
-işlev izleRegsBant()
+işlev izleRegsBant():
     b = [bcEtiket("f_izleRegs")]
     b = listeBirlestir(b, pushKayit(5))
     b = listeBirlestir(b, movKayit(5, 4))
@@ -3523,7 +3595,7 @@ işlev izleRegsBant()
 son
 
 # bekle() -> wait4(-1, &status, 0, 0), status döndürür
-işlev bekleBant()
+işlev bekleBant():
     b = [bcEtiket("f_bekle")]
     b = listeBirlestir(b, pushKayit(5))
     b = listeBirlestir(b, movKayit(5, 4))
@@ -3548,7 +3620,7 @@ son
 # kendi iç adları, davranış aynı olması yeterli. içe al'ın kendi kendini
 # derlerken (gen1→gen2) modül dosyasının var olup olmadığını sınamak için
 # kullanılıyor (bkz. tokenGenislet/iceAlYoluCoz, SÜRÜCÜ bölümünden önce).
-işlev dosyaVarMiBant()
+işlev dosyaVarMiBant():
     b = [bcEtiket("f_dosyaVarMi")]
     b = listeBirlestir(b, pushKayit(5))
     b = listeBirlestir(b, movKayit(5, 4))
@@ -3587,7 +3659,7 @@ son
 
 # yazBaytlar(rdi=yol metni, rsi=liste) -> rax=0. Listenin her ögesinin
 # DÜŞÜK BAYTINI ham yazar — UTF-8 kodlaması YAPILMAZ (yazDosya'dan farkı).
-işlev yazBaytlarBant()
+işlev yazBaytlarBant():
     b = [bcEtiket("f_yazBaytlar")]
     b = listeBirlestir(b, pushKayit(5))
     b = listeBirlestir(b, movKayit(5, 4))
@@ -3666,7 +3738,7 @@ son
 #      dosyaOkuKonum(fd, konum, uzunluk) -> metin (pread64)
 #      dosyaYazKonum(fd, konum, icerik) -> yazılan bayt sayısı (pwrite64)
 #      dosyaKapat(fd) -> 0
-işlev dosyaAcBant()
+işlev dosyaAcBant():
     b = [bcEtiket("f_dosyaAc")]
     b = listeBirlestir(b, pushKayit(5))
     b = listeBirlestir(b, movKayit(5, 4))
@@ -3702,7 +3774,7 @@ işlev dosyaAcBant()
     döndür listeBirlestir(b, retBant())
 son
 
-işlev dosyaOkuKonumBant()
+işlev dosyaOkuKonumBant():
     b = [bcEtiket("f_dosyaOkuKonum")]
     b = listeBirlestir(b, pushKayit(5))
     b = listeBirlestir(b, movKayit(5, 4))
@@ -3735,7 +3807,7 @@ işlev dosyaOkuKonumBant()
     döndür listeBirlestir(b, retBant())
 son
 
-işlev dosyaYazKonumBant()
+işlev dosyaYazKonumBant():
     b = [bcEtiket("f_dosyaYazKonum")]
     b = listeBirlestir(b, pushKayit(5))
     b = listeBirlestir(b, movKayit(5, 4))
@@ -3755,7 +3827,7 @@ işlev dosyaYazKonumBant()
     döndür listeBirlestir(b, retBant())               # rax = yazılan bayt (hatada negatif)
 son
 
-işlev dosyaKapatBant()
+işlev dosyaKapatBant():
     b = [bcEtiket("f_dosyaKapat")]
     b = listeBirlestir(b, movImm32(0, 3))            # sys_close (rdi=fd zaten yerinde)
     b = listeBirlestir(b, syscallEmit())
@@ -3769,7 +3841,7 @@ son
 # tek syscall, ret rax=sonuç). Kanıt: VETA WAL fizibilite denetimi
 # (2026-09-07) - açık fd->0, kapalı fd->-9 (davranışsal) + objdump'ta
 # `mov $0x4a,%rax` + `syscall` (statik, 0x4a=74=sys_fsync).
-işlev dosyaSenkronBant()
+işlev dosyaSenkronBant():
     b = [bcEtiket("f_dosyaSenkron")]
     b = listeBirlestir(b, movImm32(0, 74))           # sys_fsync (rdi=fd zaten yerinde)
     b = listeBirlestir(b, syscallEmit())
@@ -3791,7 +3863,7 @@ son
 # MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) ile anonim RW bellek ayırır, adresi
 # tam sayı olarak döndürür. sys_mmap = 9. mmap sıfır-doldurur (kilit için
 # "0 = açık" başlangıç durumu buradan gelir).
-işlev bellekEsleBant()
+işlev bellekEsleBant():
     b = [bcEtiket("f_bellekEsle")]
     b = listeBirlestir(b, movKayit(6, 7))        # rsi = boyut (1. parametre rdi'de geldi)
     b = listeBirlestir(b, xorKayit(7, 7))         # rdi = 0 (addr=NULL, kernel seçsin)
@@ -3805,14 +3877,14 @@ işlev bellekEsleBant()
 son
 
 # hamOku8(adres) -> adresteki 8 baytı tam sayı olarak okur.
-işlev hamOku8Bant()
+işlev hamOku8Bant():
     b = [bcEtiket("f_hamOku8")]
     b = listeBirlestir(b, movPtrOku(0, 7))       # rax = [rdi]
     döndür listeBirlestir(b, retBant())
 son
 
 # hamYaz8(adres, deger) -> adrese 8 baytlık tam sayı yazar, deger'i döndürür.
-işlev hamYaz8Bant()
+işlev hamYaz8Bant():
     b = [bcEtiket("f_hamYaz8")]
     b = listeBirlestir(b, movPtrYaz(7, 6))       # [rdi] = rsi
     b = listeBirlestir(b, movKayit(0, 6))        # rax = deger
@@ -3822,7 +3894,7 @@ son
 # futexWait(adres, beklenen) -> [adres] HÂLÂ beklenen İSE uyur (kernel
 # atomik kontrol eder — kaçırılan uyandırma YOK); değilse hemen döner
 # (EAGAIN). sys_futex = 202, FUTEX_WAIT = 0.
-işlev futexWaitBant()
+işlev futexWaitBant():
     b = [bcEtiket("f_futexWait")]
     b = listeBirlestir(b, movKayit(2, 6))         # rdx = val (beklenen değer)
     b = listeBirlestir(b, movImm32(6, 0))         # rsi = FUTEX_WAIT
@@ -3833,7 +3905,7 @@ işlev futexWaitBant()
 son
 
 # futexWake(adres, sayi) -> sayi kadar bekleyen ipliği uyandırır.
-işlev futexWakeBant()
+işlev futexWakeBant():
     b = [bcEtiket("f_futexWake")]
     b = listeBirlestir(b, movKayit(2, 6))         # rdx = sayı
     b = listeBirlestir(b, movImm32(6, 1))         # rsi = FUTEX_WAKE
@@ -3844,7 +3916,7 @@ son
 
 # kilitOlustur() -> yeni bir kilit (8 baytlık, mmap sıfır-doldurduğu için
 # 0 = AÇIK ile başlar). bellekEsle(8) ile aynı.
-işlev kilitOlusturBant()
+işlev kilitOlusturBant():
     b = [bcEtiket("f_kilitOlustur")]
     b = listeBirlestir(b, movImm32(7, 8))         # rdi = 8
     b = listeBirlestir(b, callBant("f_bellekEsle"))
@@ -3855,7 +3927,7 @@ son
 # değeri (cmpxchg'nin rax'a yazdığı) bekleyerek futexWait, tekrar dener.
 # rdi (kilit adresi) f_futexWait çağrısı boyunca DOKUNULMADAN kalır
 # (futexWaitBant rdi'yi hiç kullanmıyor/klobretmiyor — doğrulandı).
-işlev kilitleBant()
+işlev kilitleBant():
     b = [bcEtiket("f_kilitle")]
     b = ekle(b, bcEtiket("Lkil_dongu"))
     b = listeBirlestir(b, xorKayit(0, 0))         # rax = 0 (beklenen: açık)
@@ -3873,7 +3945,7 @@ son
 # kilidiAc(kilit) -> [kilit]=0 (açık), futexWake(kilit,1). rdi (kilit
 # adresi) movPtrYaz'dan sonra da değişmeden kalır (taban okunur, klobre
 # edilmez) — f_futexWake çağrısına AYNEN geçer.
-işlev kilidiAcBant()
+işlev kilidiAcBant():
     b = [bcEtiket("f_kilidiAc")]
     b = listeBirlestir(b, xorKayit(1, 1))
     b = listeBirlestir(b, movPtrYaz(7, 1))        # [rdi] = 0
@@ -3885,7 +3957,7 @@ son
 
 # atomikEkleHam(adres, miktar) -> lock xadd ile [adres]+=miktar (atomik),
 # YENİ değeri döndürür.
-işlev atomikEkleHamBant()
+işlev atomikEkleHamBant():
     b = [bcEtiket("f_atomikEkleHam")]
     b = listeBirlestir(b, movKayit(0, 6))         # rax = miktar (xadd kaynağı)
     b = listeBirlestir(b, lockXaddBellek(7, 0))   # [rdi]+=rax (atomik); rax=ESKİ değer
@@ -3900,18 +3972,18 @@ son
 # sürücüsü arg(1)/arg(2) kullanıyor (girdiYolu/ciktiYolu) ama TancElf'in
 # ürettiği kodda argv hiç yakalanmıyordu — "BAGLAMA HATASI: etiket
 # bulunamadi: f_arg" ile ortaya çıktı (bellek DEĞİL, gerçek eksik özellik).
-işlev argvYakalaBant()
+işlev argvYakalaBant():
     döndür movGenelYaz("v___argv", 4)   # v___argv = rsp (henüz bozulmamış)
 son
 
-işlev argsayBant()
+işlev argsayBant():
     b = [bcEtiket("f_argsay")]
     b = listeBirlestir(b, movGenelOku(0, "v___argv"))
     b = listeBirlestir(b, movPtrOku(0, 0))   # rax = *taban = argc
     döndür listeBirlestir(b, retBant())
 son
 
-işlev argBant()
+işlev argBant():
     b = [bcEtiket("f_arg")]
     b = listeBirlestir(b, pushKayit(5))
     b = listeBirlestir(b, movKayit(5, 4))
@@ -3955,7 +4027,7 @@ son
 # döngüde parça parça biriktirilen sonuç) İZLEMEZ — o durumda güvenli
 # varsayılan "tam" kalır (bkz. TanDurum.md "Basit hal" vs "Gerçek kullanım"
 # ayrımı, kullanıcı kararıyla kapsam bilinçli olarak burada sınırlandı).
-işlev cagriSonucTipi(ad, islevTipKutu)
+işlev cagriSonucTipi(ad, islevTipKutu):
     # ÖNCEDEN düz "==" kullanıyordu. "ad" PARAMETRE olduğundan tipi hep
     # "tam" sanılıyordu — bu fonksiyonun KENDİSİ, tam olarak listelediği
     # işlevleri (pTur/pDeger/alan dahil) DOĞRU tanıması gerekirken HER
@@ -3963,7 +4035,7 @@ işlev cagriSonucTipi(ad, islevTipKutu)
     # t/d "tam" sanılıyor, blokDerle/deyimDerle'deki ONLARCA "t=="/"d=="
     # karşılaştırması hep yanlış (0) dönüyordu — self-hosting'in en
     # yaygın kırılma noktasıydı (metinEsit ailesindeki BEŞİNCİ örnek).
-    eğer metinEsit(ad, "metin") veya metinEsit(ad, "karakter") veya metinEsit(ad, "oku") veya metinEsit(ad, "arg") veya metinEsit(ad, "alan") veya metinEsit(ad, "pTur") veya metinEsit(ad, "pDeger") veya metinEsit(ad, "metinBirlestir") veya metinEsit(ad, "metinAl") ise
+    eğer metinEsit(ad, "metin") veya metinEsit(ad, "karakter") veya metinEsit(ad, "oku") veya metinEsit(ad, "arg") veya metinEsit(ad, "alan") veya metinEsit(ad, "pTur") veya metinEsit(ad, "pDeger") veya metinEsit(ad, "metinBirlestir") veya metinEsit(ad, "metinAl") veya metinEsit(ad, "metinDilim") ise
         döndür "metin"
     son
     döndür islevTipiAra(islevTipKutu, ad)
@@ -3985,7 +4057,7 @@ son
 # islevTipiAra/islevTipiKaydet: adlarKutu ile AYNI [adlar, tipler] deseni,
 # ama ÖMRÜ bir işlev gövdesiyle sınırlı değil — sürücüde BİR KEZ oluşturulup
 # sayacKutu gibi tüm derleme boyunca AYNI kutu olarak taşınıyor.
-işlev islevTipiAra(islevTipKutu, ad)
+işlev islevTipiAra(islevTipKutu, ad):
     adlar = islevTipKutu[0]
     tipler = islevTipKutu[1]
     n = uzunluk(adlar)
@@ -3999,7 +4071,7 @@ işlev islevTipiAra(islevTipKutu, ad)
     döndür "tam"
 son
 
-işlev islevTipiKaydet(islevTipKutu, ad, tip)
+işlev islevTipiKaydet(islevTipKutu, ad, tip):
     adlar = islevTipKutu[0]
     n = uzunluk(adlar)
     yuva = 0 - 1
@@ -4019,8 +4091,8 @@ işlev islevTipiKaydet(islevTipKutu, ad, tip)
     döndür 0
 son
 
-işlev yerlesikMetinDonerMi(ad)
-    eğer metinEsit(ad, "metin") veya metinEsit(ad, "karakter") veya metinEsit(ad, "oku") veya metinEsit(ad, "arg") veya metinEsit(ad, "alan") veya metinEsit(ad, "pTur") veya metinEsit(ad, "pDeger") veya metinEsit(ad, "metinBirlestir") veya metinEsit(ad, "metinAl") ise
+işlev yerlesikMetinDonerMi(ad):
+    eğer metinEsit(ad, "metin") veya metinEsit(ad, "karakter") veya metinEsit(ad, "oku") veya metinEsit(ad, "arg") veya metinEsit(ad, "alan") veya metinEsit(ad, "pTur") veya metinEsit(ad, "pDeger") veya metinEsit(ad, "metinBirlestir") veya metinEsit(ad, "metinAl") veya metinEsit(ad, "metinDilim") ise
         döndür 1
     son
     döndür 0
@@ -4034,7 +4106,7 @@ son
 # çağıran bu durumda dönüş tipi ÇIKARIMINI ATLAR (güvenli varsayılan "tam"),
 # çünkü döndür'lerin hangi işleve ait olduğunu ayırt etmek bu basit
 # tarayıcının kapsamı dışında.
-işlev islevGovdeSonBul(tokenler, baslangic)
+işlev islevGovdeSonBul(tokenler, baslangic):
     # DÜZELTME (2026-09-06, Faz 2-b): "değilse eğer" bir elif ZİNCİRİNİN
     # DEVAMI, yeni bir iç içe blok DEĞİL — deyimDerle (satır ~862-901)
     # bu yüzden zincirin TÜMÜNÜ TEK "son" ile kapatıyor (satır 848-861'deki
@@ -4101,7 +4173,7 @@ son
 # DEĞİL, kanıt yokluğu hükmü (bkz. harfMi/kesirBits, TancElf.tan'ın kendi
 # self-hosting yolunda saf tam sayı parantezli ifadeler — bu dal onları
 # KIRMAMALI, sadece gerçekten kesir sinyali taşıyan parantezleri reddeder).
-işlev terimTipiCikar(tokenler, poz, bitis, n, ad, islevTipKutu)
+işlev terimTipiCikar(tokenler, poz, bitis, n, ad, islevTipKutu):
     eğer poz >= bitis veya poz >= n ise
         döndür ["tam", poz]
     son
@@ -4227,7 +4299,7 @@ son
 # (kısmi tahmin YOK). Dönüş: [tip, sonrakiPoz] — sonrakiPoz, ÇAĞIRANIN
 # (özellikle terimTipiCikar'ın PARAC dalının) zincirin GERÇEKTEN NEREDE
 # durduğunu (temiz mi yoksa tanınmayan bir token'da mı) anlaması için.
-işlev donusIfadesiTipiCikar(tokenler, poz, bitis, n, ad, islevTipKutu)
+işlev donusIfadesiTipiCikar(tokenler, poz, bitis, n, ad, islevTipKutu):
     sonuc = terimTipiCikar(tokenler, poz, bitis, n, ad, islevTipKutu)
     tip = sonuc[0]
     p = sonuc[1]
@@ -4287,7 +4359,7 @@ son
 # DERLEME HATASI — sessiz "tam" tahmini YOK. Aksi HER durumda (döndür yok,
 # karışık, tanınmayan desen, kesir sinyali OLMAYAN parantez) "tam" — bu
 # artık bir tahmin değil, kanıt yokluğunda verilen kesin hüküm.
-işlev govdeDonusTipiCikar(ad, tokenler, bas, bitis, islevTipKutu)
+işlev govdeDonusTipiCikar(ad, tokenler, bas, bitis, islevTipKutu):
     n = uzunluk(tokenler)
     i = bas
     doluMu = 0
@@ -4333,7 +4405,7 @@ son
 # islevTipKutu'ya yazar. Bir işlevin dönüş tipi BAŞKA bir işlevin (henüz
 # taranmamış, dosyada daha sonra tanımlı) çağrısına bağlı olabileceğinden
 # TEK GEÇİŞ yetmeyebilir — döndür 1 (değişti) ise çağıran tekrar çağırır.
-işlev islevDonusTipleriBirGecis(tokenler, islevTipKutu)
+işlev islevDonusTipleriBirGecis(tokenler, islevTipKutu):
     n = uzunluk(tokenler)
     i = 0
     degisti = 0
@@ -4375,7 +4447,7 @@ son
 # ve tipler sadece "tam"->"metin" yönünde değişebildiğinden (asla geri
 # dönmez) bu doğal olarak yakınsar; guvenlikSayaci sonsuz döngüye karşı
 # saf bir güvenlik ağı (beklenen yakınsama çok daha erken olur).
-işlev islevDonusTipleriTara(tokenler, islevTipKutu)
+işlev islevDonusTipleriTara(tokenler, islevTipKutu):
     tekrar = 1
     guvenlikSayaci = 0
     iken tekrar == 1 ve guvenlikSayaci < 200
@@ -4410,7 +4482,7 @@ son
 # AYNI [adlar,tipler] deseni ama islevTipKutu[2]/[3]'te (anahtar =
 # "islevAd/parametreAdi", islevTipiAra/Kaydet'in kullandığı [0]/[1]'den
 # AYRI — aynı kutu, farklı bölme).
-işlev parametreTipiAra(islevTipKutu, anahtar)
+işlev parametreTipiAra(islevTipKutu, anahtar):
     adlar = islevTipKutu[2]
     tipler = islevTipKutu[3]
     n = uzunluk(adlar)
@@ -4424,7 +4496,7 @@ işlev parametreTipiAra(islevTipKutu, anahtar)
     döndür "tam"
 son
 
-işlev parametreTipiKaydet(islevTipKutu, anahtar, tip)
+işlev parametreTipiKaydet(islevTipKutu, anahtar, tip):
     adlar = islevTipKutu[2]
     n = uzunluk(adlar)
     yuva = 0 - 1
@@ -4447,7 +4519,7 @@ son
 # islevParametreHaritasiCikar: TÜM üst-düzey "işlev ad(p0,p1,...)"
 # tanımlarını tarar, [adlar,parametreListeleri] paralel kutusu döner
 # (parametreListeleri[i] = adlar[i] işlevinin parametre ADI listesi).
-işlev islevParametreHaritasiCikar(tokenler)
+işlev islevParametreHaritasiCikar(tokenler):
     n = uzunluk(tokenler)
     adlar = []
     parametreListeleri = []
@@ -4481,7 +4553,7 @@ son
 
 # parametreListesiniBul: islevParametreHaritasiCikar çıktısında ad'ı ara,
 # bulunamazsa (yerleşik ya da bilinmeyen çağrı) boş liste döner.
-işlev parametreListesiniBul(harita, ad)
+işlev parametreListesiniBul(harita, ad):
     adlar = harita[0]
     listeler = harita[1]
     i = 0
@@ -4497,7 +4569,7 @@ son
 # cagriArgumanSinirlariniBul: pos = çağrının '(' AÇAN parantezinden HEMEN
 # SONRAKİ pozisyon. Argümanları üst-düzey (derinlik 0) VİRGÜL'lerle ayırıp
 # [b0,s0,b1,s1,...] düz liste döner (Tan'da liste-of-tuple yerleşiği yok).
-işlev cagriArgumanSinirlariniBul(tokenler, pos)
+işlev cagriArgumanSinirlariniBul(tokenler, pos):
     n = uzunluk(tokenler)
     sinirlar = []
     i = pos
@@ -4531,7 +4603,7 @@ son
 # SINIRLI kalıpla belirler: (a) tek METİN literali token, (b) tam olarak
 # "AD(...)" biçiminde TEK çağrı VE AD bilinen metin-döndüren biri (yerleşik
 # ya da islevTipiAra ile "metin"). Başka HER şey "tam" sayılır.
-işlev argumanMetinMi(tokenler, argBas, argBitis, islevTipKutu)
+işlev argumanMetinMi(tokenler, argBas, argBitis, islevTipKutu):
     uzunlukTok = argBitis - argBas
     eğer uzunlukTok == 1 ve alan(tokenler[argBas], 0) == "METIN" ise
         döndür 1
@@ -4552,7 +4624,7 @@ son
 # için (Faz B, TAN Float). Tek SAYIKESIR literali ya da TEK BAŞINA bilinen
 # bir kesir-döndüren KULLANICI işlevinin çağrısı tanınır. Karmaşık ifadeler
 # İZLENMEZ — güvenli varsayılan "tam" kalır (yanlış pozitif ASLA).
-işlev argumanKesirMi(tokenler, argBas, argBitis, islevTipKutu)
+işlev argumanKesirMi(tokenler, argBas, argBitis, islevTipKutu):
     uzunlukTok = argBitis - argBas
     eğer uzunlukTok == 1 ve alan(tokenler[argBas], 0) == "SAYI" ve karakterVarMi(alan(tokenler[argBas], 1), ".") ise
         döndür 1
@@ -4573,7 +4645,7 @@ son
 # yarısına (ÖNCEDEN sabit noktaya ulaşmış, bkz. islevDonusTipleriTara) ve
 # literal token'lara bakıyor — parametre yarısına geri beslenen bir
 # bağımlılık yok, TEK geçiş yeterli ve doğru.
-işlev parametreTipleriniTara(tokenler, islevTipKutu)
+işlev parametreTipleriniTara(tokenler, islevTipKutu):
     harita = islevParametreHaritasiCikar(tokenler)
     n = uzunluk(tokenler)
     i = 0
@@ -4613,7 +4685,7 @@ son
 # tipi — ÖNCEDEN koşulsuz tamTipListesi (hepsi "tam"), ARTIK her parametre
 # için parametreTipiAra ile çağrı-yeri çıkarımı sonucu (bulunamazsa "tam",
 # aynı güvenli varsayılan).
-işlev parametreTipListesiOlustur(ad, parametreler, islevTipKutu)
+işlev parametreTipListesiOlustur(ad, parametreler, islevTipKutu):
     sonuc = []
     i = 0
     iken i < uzunluk(parametreler)
@@ -4631,7 +4703,7 @@ son
 # indeksleme hangi kod yolunun üretileceğine bununla karar verir.
 # tipKutu (tek elemanlı çıkış kutusu): bant bitince en üstteki (son
 # sonucun) tipini tipKutu[0]'a yazar — çağıran (ör. atama, yaz) okur.
-işlev ifadeBantYaz(rpnBant, adlarKutu, sayacKutu, tipKutu, islevTipKutu)
+işlev ifadeBantYaz(rpnBant, adlarKutu, sayacKutu, tipKutu, islevTipKutu):
     # TAMPON KULLANIYOR (bkz. "TAMPON" başlığı) — her RPN girişi için birden
     # çok listeBirlestir çağrısı yapılıyordu, karmaşık ifadelerde O(n²).
     kodKutu = tamponOlustur()
@@ -4909,6 +4981,18 @@ işlev ifadeBantYaz(rpnBant, adlarKutu, sayacKutu, tipKutu, islevTipKutu)
                 z = tamponEkleTumu(kodKutu, nKutu, callBant("f_metin_birlestir"))
                 z = tamponEkleTumu(kodKutu, nKutu, pushKayit(0))
                 tipYigin = ekle(tipYigin, "metin")
+            değilse eğer ad == "metinDilim" ise
+                # metinDilim(s, bas, hedefUzunluk): TEK allocate + TEK
+                # bellek_kopyala bulk substring/pad (bkz. metinDilimBant).
+                # Argümanlar sırayla (s,bas,hedefUzunluk) push edildi —
+                # pop TERS sırada: rdx(hedefUzunluk) önce, sonra rsi(bas),
+                # sonra rdi(s) — genel çağrı kalıbıyla (kayitlar[]) aynı.
+                z = tamponEkleTumu(kodKutu, nKutu, popKayit(2))     # rdx = hedefUzunluk
+                z = tamponEkleTumu(kodKutu, nKutu, popKayit(6))     # rsi = bas
+                z = tamponEkleTumu(kodKutu, nKutu, popKayit(7))     # rdi = s
+                z = tamponEkleTumu(kodKutu, nKutu, callBant("f_metin_dilim"))
+                z = tamponEkleTumu(kodKutu, nKutu, pushKayit(0))
+                tipYigin = ekle(tipYigin, "metin")
             değilse eğer ad == "metinAl" ise
                 # metinAl(s,i): statik tip izlemeden BAĞIMSIZ İÇERİK indeksleme
                 # — alan() gibi işlevler "s[i]" kullanıyordu; s parametre
@@ -5104,7 +5188,7 @@ işlev ifadeBantYaz(rpnBant, adlarKutu, sayacKutu, tipKutu, islevTipKutu)
 son
 
 # setcc al  (0F 9x C0)
-işlev setccBant(kod2)
+işlev setccBant(kod2):
     b = []
     b = ekle(b, bcBayt(15))
     b = ekle(b, bcBayt(kod2))
@@ -5113,7 +5197,7 @@ işlev setccBant(kod2)
 son
 
 # movzx rax, al  (48 0F B6 C0)
-işlev movzxAlBant()
+işlev movzxAlBant():
     b = []
     b = ekle(b, bcBayt(72))
     b = ekle(b, bcBayt(15))
@@ -5122,7 +5206,7 @@ işlev movzxAlBant()
     döndür b
 son
 
-işlev karsilastirmaKodu(islec)
+işlev karsilastirmaKodu(islec):
     eğer islec == "==" ise
         döndür 148
     son
@@ -5142,7 +5226,7 @@ işlev karsilastirmaKodu(islec)
 son
 
 # karsilastirmaMi: islec bir KARŞILAŞTIRMA operatörü mü (sonuç tipi "tam").
-işlev karsilastirmaMi(islec)
+işlev karsilastirmaMi(islec):
     eğer islec == "==" veya islec == "!=" veya islec == ">" veya islec == "<" veya islec == ">=" veya islec == "<=" ise
         döndür 1
     son
@@ -5152,7 +5236,7 @@ son
 # kesirKarsilastirmaKodu: comisd (66 0F 2F) İŞARETSİZ bayraklar üretir, bu
 # yüzden setcc kodları tamsayı (cmp) kodlarından FARKLIDIR (Go 1452-1462):
 # ==148 !=149 >151 <146 >=147 <=150.
-işlev kesirKarsilastirmaKodu(islec)
+işlev kesirKarsilastirmaKodu(islec):
     eğer islec == "==" ise
         döndür 148
     son
@@ -5184,7 +5268,7 @@ son
 # parametreTipListesiOlustur bulunamayanlar için güvenli "tam" varsayılanına
 # döner (DerleElf.go'nun parametreTipleriniOgren'i kadar derin değil ama
 # aynı "asla yanlış pozitif" ilkesiyle).
-işlev islevDerle(ad, parametreler, tokenler, pozKutu, sayacKutu, islevTipKutu)
+işlev islevDerle(ad, parametreler, tokenler, pozKutu, sayacKutu, islevTipKutu):
     yerelAdlarKutu = [parametreler, parametreTipListesiOlustur(ad, parametreler, islevTipKutu)]
     govde = blokDerle(tokenler, pozKutu, yerelAdlarKutu, sayacKutu, ["", ""], islevTipKutu)
     eğer pTur(tokenler, pozKutu) == "ANAHTAR" ve pDeger(tokenler, pozKutu) == "son" ise
@@ -5241,7 +5325,7 @@ son
 # çıktısı üzerinde, deyimDerle'den TAMAMEN BAĞIMSIZ çalışıyor.
 
 # dosyaDizini(yol): son "/" karakterine kadar olan kısmı döndürür (yoksa ".").
-işlev dosyaDizini(yol)
+işlev dosyaDizini(yol):
     n = uzunluk(yol)
     i = n - 1
     iken i >= 0 ve değil metinEsit(metinAl(yol, i), "/")
@@ -5262,7 +5346,7 @@ son
 # iceAlYoluCoz: basitleştirilmiş modül arama — 1) kaynak dosyanın yanı,
 # 2) kaynak dosyanın kutuphane/ alt dizini, 3) verilen yol olduğu gibi
 # (çalışma dizinine göre, "kutuphane/X.tan" tarzı çağrılar için).
-işlev iceAlYoluCoz(yol, kaynakDizin)
+işlev iceAlYoluCoz(yol, kaynakDizin):
     aday1 = metinBirlestir(kaynakDizin, metinBirlestir("/", yol))
     eğer dosyaVarMi(aday1) ise
         döndür aday1
@@ -5278,7 +5362,7 @@ son
 # yerde o üç token'ı SİLİP yerine modülün (yinelemeli genişletilmiş)
 # token'larını yerleştirir. Aynı modül (mutlak/verilen yola göre) bir daha
 # alınmaz (gorulenlerKutu[0] ile izlenir, döngüsel içe almaya karşı da korur).
-işlev tokenGenislet(tokenler, kaynakDizin, gorulenlerKutu)
+işlev tokenGenislet(tokenler, kaynakDizin, gorulenlerKutu):
     cikisKutu = tamponOlustur()
     cN = [0]
     poz = [0]
@@ -5334,7 +5418,7 @@ son
 # sonrası ilk pozisyon (islevGovdeSonBul semantiği). İç içe işlevler AYRI
 # kaydedilmez — gövdeleri üst işlevin [bas, bitis) aralığında kalır; üst
 # erişilebilirse gövde taraması zaten onları da kapsar.
-işlev islevGovdeHaritasiCikar(tokenler, haritaKutu)
+işlev islevGovdeHaritasiCikar(tokenler, haritaKutu):
     n = uzunluk(tokenler)
     adlar = []
     basListe = []
@@ -5369,7 +5453,7 @@ işlev islevGovdeHaritasiCikar(tokenler, haritaKutu)
     döndür 0
 son
 
-işlev adListedeMi(liste, ad)
+işlev adListedeMi(liste, ad):
     n = uzunluk(liste)
     i = 0
     iken i < n
@@ -5381,7 +5465,7 @@ işlev adListedeMi(liste, ad)
     döndür 0
 son
 
-işlev adIndisBul(liste, ad)
+işlev adIndisBul(liste, ad):
     n = uzunluk(liste)
     i = 0
     iken i < n
@@ -5398,7 +5482,7 @@ son
 # ad işlev adları listesindeyse. Builtin'ler (yaz, metin, ekle, uzunluk...)
 # işlev adları listesinde OLMADIĞI için elenir; yanlış-pozitifler en kötü
 # ihtimalle bir işlevi budanmaktan korur (güvenli yön), yanlış-negatif yok.
-işlev işlevCagirdiklariniTopla(tokenler, bas, bitis, işlevAdlari)
+işlev işlevCagirdiklariniTopla(tokenler, bas, bitis, işlevAdlari):
     sonuc = []
     i = bas
     iken i < bitis - 1
@@ -5416,7 +5500,7 @@ son
 # token tabanlı karşılığı (BFS). Tohum: ana (üst-seviye) gövdenin kullanıcı
 # işlev çağrıları — işlev gövdeleri [bas, bitis) aralıklarından atlanarak
 # top-level jetonlar taranır. Sonuç islevTipKutu[4]'e yazılır.
-işlev ulasilabilirIslevleriTara(tokenler, islevTipKutu)
+işlev ulasilabilirIslevleriTara(tokenler, islevTipKutu):
     haritaKutu = [[], [], []]
     z = islevGovdeHaritasiCikar(tokenler, haritaKutu)
     adlar = haritaKutu[0]
@@ -5493,7 +5577,7 @@ son
 # çağrıldığı taranır, bağımlılık kapanışı (f_tan_ayir/f_bellek_kopyala gibi
 # iç çağrılar) eklenir ve SADECE o küme gömülür. Go tarafı (DerleElf.go) bu
 # budamayı otomatik yapar — TancElf'in karşılığı bu üç işlevdir.
-işlev yardimciBagimliliklari(ad)
+işlev yardimciBagimliliklari(ad):
     eğer metinEsit(ad, "f_liste_ekle") ise
         döndür ["f_tan_ayir", "f_bellek_kopyala"]
     değilse eğer metinEsit(ad, "f_liste_yap") ise
@@ -5501,6 +5585,8 @@ işlev yardimciBagimliliklari(ad)
     değilse eğer metinEsit(ad, "f_sayi_metne") ise
         döndür ["f_tan_ayir"]
     değilse eğer metinEsit(ad, "f_metin_birlestir") ise
+        döndür ["f_tan_ayir", "f_bellek_kopyala"]
+    değilse eğer metinEsit(ad, "f_metin_dilim") ise
         döndür ["f_tan_ayir", "f_bellek_kopyala"]
     değilse eğer metinEsit(ad, "f_metin_indeks") ise
         döndür ["f_tan_ayir"]
@@ -5548,7 +5634,7 @@ son
 
 # yardimciKapanisi: kökler (govde'de DOĞRUDAN çağrılan yardımcılar) +
 # bağımlılık kapanışı. BFS — yardimciBagimliliklari yapraklara iner.
-işlev yardimciKapanisi(kokler)
+işlev yardimciKapanisi(kokler):
     sonuc = kokler
     kuyruk = kokler
     j = 0
@@ -5573,7 +5659,7 @@ son
 # yardımcı adlarında olanları (tekil) toplar. Kullanıcı işlevleri "f_"+ad
 # etiketiyle çağrıldığından whitelist (yardimciAdlar) dışında kalan tüm
 # f_* hedefleri ESNEKTİR — yalnız gerçek yardımcılar yakalanır.
-işlev yardimciKullanimiTara(bant, yardimciAdlar)
+işlev yardimciKullanimiTara(bant, yardimciAdlar):
     sonuc = []
     n = uzunluk(bant)
     i = 0
@@ -5661,8 +5747,8 @@ degiskenSayisi = uzunluk(adlarKutu[0])
 cerceveBoy = 8 * degiskenSayisi + 16
 
 # --- Faz 5 (B): kullanılan yardımcı kümesini govde bandından çıkar ---
-yardimciAdlar = ["yaz_sayi", "f_tan_ayir", "f_bellek_kopyala", "f_liste_ekle", "f_liste_yap", "f_sayi_metne", "f_metin_birlestir", "f_metin_esit", "f_metin_indeks", "f_kod", "f_karakter", "f_yaz_metin", "f_yazHam", "f_zaman", "f_soketAc", "f_soketBagla", "f_soketYaz", "f_soketOku", "f_soketKapat", "f_soketDinle", "f_soketKabul", "f_catal", "f_izle", "f_calistir", "f_bekle", "f_izleRegs", "f_oku", "f_yazDosya", "f_yazDosyaCalistirilabilir", "f_dosyaAc", "f_dosyaOkuKonum", "f_dosyaYazKonum", "f_dosyaKapat", "f_girdiOku", "f_girdiOkuN", "f_dosyaVarMi", "f_dosyaSenkron", "f_yazBaytlar", "f_argsay", "f_arg", "f_kesir_metne", "f_yaz_kesir", "f_hata_sifira_bolme", "f_bellekEsle", "f_hamOku8", "f_hamYaz8", "f_futexWait", "f_futexWake", "f_kilitOlustur", "f_kilitle", "f_kilidiAc", "f_atomikEkleHam"]
-yardimciBantlar = [yazSayiBant(), tanAyirBant(), bellekKopyalaBant(), listeEkleBant(), listeYapBant(), sayiMetneBant(), metinBirlestirBant(), metinEsitBant(), metinIndeksBant(), kodBant(), karakterBant(), yazMetinBant(), yazHamBant(), zamanBant(), soketAcBant(), soketBaglaBant(), soketYazBant(), soketOkuBant(), soketKapatBant(), soketDinleBant(), soketKabulBant(), catalBant(), izleBant(), calistirBant(), bekleBant(), izleRegsBant(), okuBant(), yazDosyaBant(), yazDosyaCalistirilabilirBant(), dosyaAcBant(), dosyaOkuKonumBant(), dosyaYazKonumBant(), dosyaKapatBant(), girdiOkuBant(), girdiOkuNBant(), dosyaVarMiBant(), dosyaSenkronBant(), yazBaytlarBant(), argsayBant(), argBant(), kesirMetneBant(), yazKesirBant(), hataSifiraBolmeBant(), bellekEsleBant(), hamOku8Bant(), hamYaz8Bant(), futexWaitBant(), futexWakeBant(), kilitOlusturBant(), kilitleBant(), kilidiAcBant(), atomikEkleHamBant()]
+yardimciAdlar = ["yaz_sayi", "f_tan_ayir", "f_bellek_kopyala", "f_liste_ekle", "f_liste_yap", "f_sayi_metne", "f_metin_birlestir", "f_metin_dilim", "f_metin_esit", "f_metin_indeks", "f_kod", "f_karakter", "f_yaz_metin", "f_yazHam", "f_zaman", "f_soketAc", "f_soketBagla", "f_soketYaz", "f_soketOku", "f_soketKapat", "f_soketDinle", "f_soketKabul", "f_catal", "f_izle", "f_calistir", "f_bekle", "f_izleRegs", "f_oku", "f_yazDosya", "f_yazDosyaCalistirilabilir", "f_dosyaAc", "f_dosyaOkuKonum", "f_dosyaYazKonum", "f_dosyaKapat", "f_girdiOku", "f_girdiOkuN", "f_dosyaVarMi", "f_dosyaSenkron", "f_yazBaytlar", "f_argsay", "f_arg", "f_kesir_metne", "f_yaz_kesir", "f_hata_sifira_bolme", "f_bellekEsle", "f_hamOku8", "f_hamYaz8", "f_futexWait", "f_futexWake", "f_kilitOlustur", "f_kilitle", "f_kilidiAc", "f_atomikEkleHam"]
+yardimciBantlar = [yazSayiBant(), tanAyirBant(), bellekKopyalaBant(), listeEkleBant(), listeYapBant(), sayiMetneBant(), metinBirlestirBant(), metinDilimBant(), metinEsitBant(), metinIndeksBant(), kodBant(), karakterBant(), yazMetinBant(), yazHamBant(), zamanBant(), soketAcBant(), soketBaglaBant(), soketYazBant(), soketOkuBant(), soketKapatBant(), soketDinleBant(), soketKabulBant(), catalBant(), izleBant(), calistirBant(), bekleBant(), izleRegsBant(), okuBant(), yazDosyaBant(), yazDosyaCalistirilabilirBant(), dosyaAcBant(), dosyaOkuKonumBant(), dosyaYazKonumBant(), dosyaKapatBant(), girdiOkuBant(), girdiOkuNBant(), dosyaVarMiBant(), dosyaSenkronBant(), yazBaytlarBant(), argsayBant(), argBant(), kesirMetneBant(), yazKesirBant(), hataSifiraBolmeBant(), bellekEsleBant(), hamOku8Bant(), hamYaz8Bant(), futexWaitBant(), futexWakeBant(), kilitOlusturBant(), kilitleBant(), kilidiAcBant(), atomikEkleHamBant()]
 kullanilanYardimcilar = yardimciKullanimiTara(govde, yardimciAdlar)
 gomulcekYardimcilar = yardimciKapanisi(kullanilanYardimcilar)
 

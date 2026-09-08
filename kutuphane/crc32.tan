@@ -1,0 +1,65 @@
+# crc32.tan — TAN'da CRC32 (IEEE 802.3 polinomu, 0xEDB88320), bit-bit FOLD.
+#
+# NEDEN (VETA WAL crash-gate denetimi, 2026-09-08/09): WAL'ın checksum
+# ihtiyacı crash/torn-write tespiti — tehdit modeli adversary DEĞİL.
+# sha256.tan (bkz. o dosyanın satır 5 notu: "bayt listesi ekle() O(n²) —
+# küçük kaynak dosyaları için uygun") 8KB'lık WAL kayıtlarında ÇALIŞAMAZ:
+# mesajı ekle() ile bayt-listesine çeviriyor, ekle() KOPYALAYARAK büyüdüğü
+# için (asla yerinde değiştirmez) bu O(n²) + GC'siz arende KALICI sızıntı
+# (8256 baytlık kayıt için tek hash çağrısı ~500MB+ sızdırıyor — recovery
+# birkaç kayıtta GB'lara çıkıp OOM/WSL çökmesine yol açtı). SHA-256 hem bu
+# iş için gereksiz güçlü (kriptografik dayanıklılık gerekmiyor) hem TAN
+# implementasyonu büyük girdide kırık — CRC32'ye gerek yok değil, CRC32
+# YETERLİ ve DOĞRU tehdit modeli.
+#
+# BU IMPLEMENTASYON LİSTE KURMAZ, TABLO KURMAZ — tek 32-bit akümülatör
+# (TAN "tam" değer-tipi: register/yığın değeri, HEAP ALLOCATION YOK —
+# 5M-iterasyonluk reassignment döngüsüyle doğrulandı, RSS düz kaldı).
+# Bayt başına 8-bit fold. O(n) zaman, O(1) bellek, sızıntı YAPISAL OLARAK
+# YOK (fold semantiği: aynı değişkene yeniden atama, liste/dize büyütme
+# değil).
+#
+# UYARI: crc32Guncelle'yi ASLA ekle()/liste ile "byte dizisi kur, sonra
+# işle" şeklinde SARMALAMA — bu, sha256.tan'ın DÜŞTÜĞÜ TUZAĞIN AYNISINI
+# ÜÇÜNCÜ KEZ üretir. Fold discipline: crc HER ZAMAN tek skaler, döngü
+# gövdesi HİÇBİR ZAMAN yeni bir liste/uzun dize biriktirmemeli.
+
+# crc32Guncelle(crc, bayt) -> yeni crc (0..0xFFFFFFFF). Standart bit-bit
+# CRC32 adımı — tablo yok, tek akümülatör.
+işlev crc32Guncelle(crc, bayt)
+    crc = crc ^ bayt
+    i = 0
+    iken i < 8
+        eğer (crc & 1) == 1 ise
+            crc = (crc >> 1) ^ 3988292384
+        değilse
+            crc = crc >> 1
+        son
+        i = i + 1
+    son
+    döndür crc & 4294967295
+son
+
+# crc32(mesaj) -> tam sayı (0..0xFFFFFFFF). Başlangıç/son XOR standart
+# IEEE 802.3 CRC32 ile aynı (0xFFFFFFFF init + final invert).
+işlev crc32(mesaj)
+    crc = 4294967295
+    n = uzunluk(mesaj)
+    i = 0
+    iken i < n
+        crc = crc32Guncelle(crc, kod(metinAl(mesaj, i)))
+        i = i + 1
+    son
+    döndür (crc ^ 4294967295) & 4294967295
+son
+
+# 4 ham bayt (big-endian) — sha256Ham ile AYNI sözleşme (Wal.tan checksum
+# alanı bu ikisini birbirinin yerine koyabilsin diye).
+işlev crc32Ham(mesaj)
+    c = crc32(mesaj)
+    r = karakter((c >> 24) & 255)
+    r = metinBirlestir(r, karakter((c >> 16) & 255))
+    r = metinBirlestir(r, karakter((c >> 8) & 255))
+    r = metinBirlestir(r, karakter(c & 255))
+    döndür r
+son

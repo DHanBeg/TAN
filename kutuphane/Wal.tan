@@ -15,22 +15,77 @@
 # islemSayfaYaz). Rollback: transaction'ın WAL lsn aralığını GERİYE
 # doğru tarar, eskiIcerik'i sayfaya geri yazar (undo log).
 #
-# BİLİNEN SINIR (dürüst): fsync YOK — WAL'ın kendisi de gerçek sayfa
-# kadar "durable" (2B'nin sınırı). Crash-recovery (WAL'dan REDO) bu
-# eklemenin kapsamı DIŞINDA — sadece çalışan process içinde rollback
-# destekleniyor (Atomicity: evet: WAL öncesi geri alınabilir; Isolation:
-# YOK, tek-thread varsayımı; Durability: KISMİ, fsync yok).
+# DÜZELTME (2026-09-08, Faz 3-ön WAL denetimi): fsync ARTIK VAR
+# (dosyaSenkron, TancElf.tan sys_fsync=74 builtin, 2026-09-07 eklendi —
+# bkz. testler/dosyaSenkron_testleri.tan) — commit-zamanlı fsync
+# Islem.tan:islemCommit'te uygulanıyor (her-commit-fsync). Her kayıt
+# checksum taşıyor (walOzetBoyutu() bayt, yeniIcerik'ten SONRA). Commit
+# kaydı (walEkleCommit, "C:" önekli) artık WAL'a yazılıyor; crash-recovery
+# (walGecerliSinir + Islem.tan:islemKurtar, redo-komitliler + undo-
+# loser'lar) eklendi. Aşağıdaki eski "BİLİNEN SINIR" notu bu haliyle
+# KAPANDI, tarihsel kayıt olarak bırakıldı:
+#
+# DÜZELTME (2026-09-09, checksum SHA-256 -> CRC32): İLK sürüm SHA-256
+# kullanıyordu (kutuphane/sha256.tan) — YANLIŞ SEÇİMDİ, geri alındı.
+# Kök neden: sha256.tan mesajı ekle() ile bayt-listesine çeviriyor, ekle()
+# KOPYALAYARAK büyüdüğü için (o dosyanın kendi notu: "küçük kaynak
+# dosyaları için uygun") 8KB'lık WAL kayıtlarında O(n²) + GC'siz arende
+# KALICI sızıntı üretiyordu — crash-recovery testinde birkaç kayıtta
+# GB'larca RAM tüketip OOM/WSL çökmesine yol açtı (VETA WAL crash-gate
+# denetimi). WAL'ın tehdit modeli crash/torn-write (adversary DEĞİL),
+# SHA-256'nın kriptografik dayanıklılığına hiç ihtiyaç yoktu — CRC32
+# (kutuphane/crc32.tan, tablo/liste KURMAYAN bit-bit fold, O(n) zaman,
+# O(1) bellek) hem yeterli hem TAN'da güvenle çalışıyor. sha256.tan'ın
+# kendisi DOKUNULMADI (kendi çağıranları için ayrı foundation-debt,
+# büyük girdide kullanılmamalı — bkz. o dosyanın güncellenmiş notu).
+#
+# [ESKİ, 2026-08-22] fsync YOK — WAL'ın kendisi de gerçek sayfa kadar
+# "durable" (2B'nin sınırı). Crash-recovery (WAL'dan REDO) bu eklemenin
+# kapsamı DIŞINDA — sadece çalışan process içinde rollback destekleniyor
+# (Atomicity: evet: WAL öncesi geri alınabilir; Isolation: YOK, tek-thread
+# varsayımı; Durability: KISMİ, fsync yok).
+#
+# DÜRÜST SINIR (hâlâ geçerli): checkpoint/WAL kırpma YOK — WAL sınırsız
+# büyür, recovery her seferinde baştan tarar (küçük/orta ölçek için
+# yeterli, büyük ölçekte O(n) recovery maliyeti var, ayrı iş). Sayfa
+# yazımları (pmSayfaYaz) kendi başına fsync'li DEĞİL — WAL commit-zamanlı
+# fsync'li olduğu için sayfa içeriği redo ile her zaman yeniden kurulabilir,
+# bu yüzden sayfa-seviyesi fsync gereksiz (standart WAL/ARIES modeli).
+#
+# DÜZELTME (2026-09-09, streaming yeniden yazım — TancElf arena taşması
+# BULUNDU): İlk recovery denemesi (walGecerliSinir ayrı ön-tarama + komitli
+# listesi TAM kayıt okuyarak, walKayitOku ile checksum hesaplayarak)
+# birkaç transaction sonrası TancElf'in (GC'siz, muhtemelen sabit boyutlu
+# arena) belleğini taşırdı — WSL çöktü (Wsl/Service/E_UNEXPECTED).
+# walKayitOku çağrısı başına ~8288 bayt (2×PAGE_SIZE + checksum + başlık)
+# ayırıyor; 4 geçiş × N kayıt = 4N tam okuma hızla birikiyordu. Düzeltme:
+# marker taraması artık walBaslikOku (64 bayt, checksum YOK) kullanıyor —
+# tam kayıt okuma sadece redo/undo geçişlerinde (2N'e indi, walGecerliSinir
+# ayrı ön-taraması kaldırıldı, sınır artık redo geçişine gömülü). Bu HÂLÂ
+# O(n) kalıcı bellek-yoğun — checkpoint/kırpma olmadan büyük WAL'da aynı
+# sorun tekrar edebilir (dürüst, ayrı iş).
 # ============================================================
 
 içe al "kutuphane/tanoku.tan"
 içe al "kutuphane/PageManager.tan"
+içe al "kutuphane/crc32.tan"
 
 işlev walBasligBoyut()
     döndür 64
 son
 
 işlev walKayitBoyutu()
-    döndür walBasligBoyut() + pageBoyut() * 2
+    döndür walBasligBoyut() + pageBoyut() * 2 + walOzetBoyutu()
+son
+
+# CRC32 checksum alanı boyutu (ham bayt, hex DEĞİL — crc32Ham()).
+# DÜZELTME (2026-09-09, WAL crash-gate): eskiden SHA-256 (32 bayt) —
+# TAN'ın sha256.tan implementasyonu 8KB'lık WAL kayıtlarında O(n²)+
+# sızıntı üretip crash-recovery'yi çökertiyordu (kendi notu: "küçük
+# kaynak dosyaları için uygun"). Tehdit modeli crash/torn-write (adversary
+# değil) zaten CRC32'yi yeterli kılıyordu — bkz. kutuphane/crc32.tan.
+işlev walOzetBoyutu()
+    döndür 4
 son
 
 # n uzunluğa sağdan boşlukla doldurur (sabit-genişlik alan kodlama)
@@ -42,41 +97,23 @@ işlev walSabitGenislik(s, n)
     döndür r
 son
 
-# icerik'i tam PAGE_SIZE'a normalize eder (kısaysa sıfır doldurur, uzunsa kırpar)
+# icerik'i tam PAGE_SIZE'a normalize eder (kısaysa sıfır doldurur, uzunsa
+# kırpar). DÜZELTME (2026-09-08, VETA WAL crash-gate denetimi): eskiden
+# tek-karakter metinBirlestir döngüsüydü — GC'siz arende (TancElf.tan
+# tanAyirBant) O(n²) zaman + O(n²) kalıcı sızıntı üretiyordu (4096 baytlık
+# sayfa için ~8M karakterlik ara-çöp, TEK çağrıda). metinDilim (TancElf.tan
+# f_metin_dilim, TEK allocate+TEK bellek_kopyala) n==b ise bile no-op DEĞİL
+# (yeni buffer döner) ama O(n), sızıntı n'e orantılı — GC yokluğu KAPANMADI
+# (foundation-debt, ayrı iş), sadece n²'den n'e indirildi.
 işlev walIcerikNormalize(icerik)
-    n = uzunluk(icerik)
-    b = pageBoyut()
-    eğer n > b ise
-        r = ""
-        i = 0
-        iken i < b
-            r = metinBirlestir(r, metinAl(icerik, i))
-            i = i + 1
-        son
-        döndür r
-    değilse eğer n < b ise
-        r = icerik
-        dolgu = b - n
-        i = 0
-        iken i < dolgu
-            r = metinBirlestir(r, karakter(0))
-            i = i + 1
-        son
-        döndür r
-    son
-    döndür icerik
+    döndür metinDilim(icerik, 0, pageBoyut())
 son
 
-# metin'in [bas, bas+n) aralığını döndürür
+# metin'in [bas, bas+n) aralığını döndürür. DÜZELTME (2026-09-08, WAL
+# crash-gate): eskiden tek-karakter metinBirlestir döngüsüydü, aynı O(n²)
+# zaman+sızıntı — bkz. walIcerikNormalize notu. metinDilim ile O(n).
 işlev walAltMetin(s, bas, n)
-    r = ""
-    i = bas
-    son2 = bas + n
-    iken i < son2
-        r = metinBirlestir(r, metinAl(s, i))
-        i = i + 1
-    son
-    döndür r
+    döndür metinDilim(s, bas, n)
 son
 
 # wal dosyasını açar (yoksa oluşturur). wal = [fd, sayacKutu]
@@ -113,26 +150,102 @@ işlev walEkle(wal, txId, sayfaNo, eskiIcerik, yeniIcerik)
     konum = walBasligBoyut() + lsn * walKayitBoyutu()
     baslikHam = metinBirlestir("W:", metinBirlestir(metin(txId), metinBirlestir(":", metin(sayfaNo))))
     baslik = walSabitGenislik(baslikHam, walBasligBoyut())
-    kayit = metinBirlestir(baslik, metinBirlestir(walIcerikNormalize(eskiIcerik), walIcerikNormalize(yeniIcerik)))
+    eskiN = walIcerikNormalize(eskiIcerik)
+    yeniN = walIcerikNormalize(yeniIcerik)
+    ozet = crc32Ham(metinBirlestir(baslik, metinBirlestir(eskiN, yeniN)))
+    kayit = metinBirlestir(baslik, metinBirlestir(eskiN, metinBirlestir(yeniN, ozet)))
     z = dosyaYazKonum(fd, konum, kayit)
     sayacKutu[0] = lsn + 1
     z = walSayacYaz(fd, sayacKutu[0])
     döndür lsn
 son
 
-# lsn numaralı kaydı okur: [sayfaNo, eskiIcerik, yeniIcerik] döndürür
+# Commit işareti kaydı ekler (tür "C:", içerik boş). walKurtar bu kaydın
+# varlığına bakarak bir txId'nin "kazanan" (redo) mı "kaybeden" (undo) mı
+# olduğuna karar verir. islemCommit tarafından, fsync'ten ÖNCE çağrılır.
+işlev walEkleCommit(wal, txId)
+    fd = wal[0]
+    sayacKutu = wal[1]
+    lsn = sayacKutu[0]
+    konum = walBasligBoyut() + lsn * walKayitBoyutu()
+    baslikHam = metinBirlestir("C:", metinBirlestir(metin(txId), ":0"))
+    baslik = walSabitGenislik(baslikHam, walBasligBoyut())
+    bos = walIcerikNormalize("")
+    ozet = crc32Ham(metinBirlestir(baslik, metinBirlestir(bos, bos)))
+    kayit = metinBirlestir(baslik, metinBirlestir(bos, metinBirlestir(bos, ozet)))
+    z = dosyaYazKonum(fd, konum, kayit)
+    sayacKutu[0] = lsn + 1
+    z = walSayacYaz(fd, sayacKutu[0])
+    döndür lsn
+son
+
+# HAFİF okuma: sadece başlığı (walBasligBoyut() bayt, 64) okur — sayfa
+# içeriği (2×PAGE_SIZE) ya da checksum YOK. [txId, tur] döndürür.
+# İsimli-taşıyıcı (marker) taraması için (Islem.tan:islemKurtar 1. geçiş) —
+# checksum doğrulaması YAPMAZ, bu yüzden tek başına GÜVENİLİR sınır
+# belirleyici DEĞİL (bkz. walKayitOku, tam/checksum'lı okuma). Amaç:
+# recovery'nin ilk geçişinde N kere ~8288 bayt yerine N kere 64 bayt
+# ayırmak (TancElf arena taşması bulgusu, bkz. dosya başı DÜZELTME notu).
+işlev walBaslikOku(wal, lsn)
+    fd = wal[0]
+    konum = walBasligBoyut() + lsn * walKayitBoyutu()
+    baslikHam = metinBirlestir("", dosyaOkuKonum(fd, konum, walBasligBoyut()))
+    baslik = kirp(baslikHam)
+    tur = metinAl(baslik, 0)
+    ilkIki = karakterBul(baslik, ":", 0)
+    sonIki = karakterBul(baslik, ":", ilkIki + 1)
+    txIdMetin = walAltMetin(baslik, ilkIki + 1, sonIki - ilkIki - 1)
+    txId = pmMetneTam(txIdMetin, 0)
+    döndür [txId, tur]
+son
+
+# lsn numaralı kaydı okur: [sayfaNo, eskiIcerik, yeniIcerik, txId, tur,
+# gecerli] döndürür. tur = "W" (sayfa yazımı) ya da "C" (commit işareti).
+# gecerli = 1 ise SHA-256 checksum tutuyor, 0 ise kayıt bozuk/yarım
+# (crash sırasında yarım kalan yazım) — çağıran bunu recovery sınırı
+# olarak kullanmalı (bkz. walGecerliSinir). İlk üç alan (sayfaNo/eskiIcerik/
+# yeniIcerik) eski çağıranlarla (Islem.tan:islemRollback) uyumluluk için
+# AYNI INDEKSTE — yeni alanlar SONA eklendi.
 işlev walKayitOku(wal, lsn)
     fd = wal[0]
     konum = walBasligBoyut() + lsn * walKayitBoyutu()
     kayit = metinBirlestir("", dosyaOkuKonum(fd, konum, walKayitBoyutu()))
-    baslik = kirp(walAltMetin(kayit, 0, walBasligBoyut()))
-    # baslik = "W:<txId>:<sayfaNo>" — son ":" sonrası sayfaNo
-    sonIki = karakterBul(baslik, ":", karakterBul(baslik, ":", 0) + 1)
+    baslikHam = walAltMetin(kayit, 0, walBasligBoyut())
+    baslik = kirp(baslikHam)
+    tur = metinAl(baslik, 0)
+    # baslik = "<tür>:<txId>:<sayfaNo>"
+    ilkIki = karakterBul(baslik, ":", 0)
+    sonIki = karakterBul(baslik, ":", ilkIki + 1)
+    txIdMetin = walAltMetin(baslik, ilkIki + 1, sonIki - ilkIki - 1)
+    txId = pmMetneTam(txIdMetin, 0)
     sayfaNoMetin = walAltMetin(baslik, sonIki + 1, uzunluk(baslik) - sonIki - 1)
     sayfaNo = pmMetneTam(sayfaNoMetin, 0)
     eskiIcerik = walAltMetin(kayit, walBasligBoyut(), pageBoyut())
     yeniIcerik = walAltMetin(kayit, walBasligBoyut() + pageBoyut(), pageBoyut())
-    döndür [sayfaNo, eskiIcerik, yeniIcerik]
+    ozetOkunan = walAltMetin(kayit, walBasligBoyut() + pageBoyut() * 2, walOzetBoyutu())
+    ozetHesap = crc32Ham(metinBirlestir(baslikHam, metinBirlestir(eskiIcerik, yeniIcerik)))
+    gecerli = 0
+    eğer metinEsit(ozetOkunan, ozetHesap) ise
+        gecerli = 1
+    son
+    döndür [sayfaNo, eskiIcerik, yeniIcerik, txId, tur, gecerli]
+son
+
+# WAL'da recovery için GÜVENLE taranabilecek lsn sınırını (exclusive)
+# bulur: baştan tarar, checksum'ı tutmayan İLK kayıtta durur (crash
+# sırasında yarım kalmış son yazım — sonrası GÜVENİLMEZ, atlanır).
+işlev walGecerliSinir(wal)
+    n = walSonLsn(wal)
+    i = 0
+    iken i < n
+        kayit = walKayitOku(wal, i)
+        gecerli = kayit[5]
+        eğer gecerli == 0 ise
+            döndür i
+        son
+        i = i + 1
+    son
+    döndür n
 son
 
 işlev walKapat(wal)

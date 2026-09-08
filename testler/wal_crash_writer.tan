@@ -1,0 +1,39 @@
+# wal_crash_writer.tan — GERÇEK crash-injection için yazıcı process.
+# Mevcut storage_testleri.tan'daki "crash" testleri hep TEK process
+# içinde simüle ediyor (elle bozma / commit'i hiç çağırmama) — gerçek
+# OS-seviyeli process ölümü DEĞİL. Bu script dış kabuktan (bkz.
+# wal_crash_harness.sh) arka planda başlatılıp `kill -9` ile GERÇEKTEN
+# öldürülmek üzere yazıldı: temiz kapanış (pmKapat/walKapat) YOK,
+# sonsuz döngüde asılı kalır.
+#
+# arg(1)=db yolu, arg(2)=wal yolu, arg(3)=mod ("commit" | "commitsiz")
+# Sabit: sayfaNo=1 (harness her koşuda db/wal dosyalarını temiz baştan
+# açar, bu yüzden ilk pmSayfaAyir() her zaman 1 döner), txId=777.
+
+içe al "kutuphane/Islem.tan"
+
+dbYol = arg(1)
+walYol = arg(2)
+mod = arg(3)
+
+pm = pmAc(dbYol)
+wal = walAc(walYol)
+z = islemKurtar(pm, wal)
+
+sayfaNo = pmSayfaAyir(pm)
+z = pmSayfaYaz(pm, sayfaNo, "TABAN-DEGER")
+
+tx = islemBaslat(pm, wal, 777)
+z = islemSayfaYaz(tx, sayfaNo, "CRASH-YAZIMI")
+
+eğer metinEsit(mod, "commit") ise
+    z = islemCommit(tx)
+son
+
+# BURADAN SONRA dış kabuk SIGKILL gönderir. pmKapat/walKapat KASITLI
+# ÇAĞRILMIYOR — temiz kapanış crash'i simüle etmez.
+yaz("HAZIR-BEKLIYOR")
+sayac = 0
+iken doğru
+    sayac = sayac + 1
+son

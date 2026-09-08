@@ -1,0 +1,60 @@
+# turkce_kimlik_testleri.tan — opsiyonel ':' sözdizimi + Türkçe karakterli
+# kimlik (işlev adı/değişken) testleri. "işlev ad(param):" biçimini VE
+# ş/ğ/ö/ü/ç içeren adların tokenizer'da doğru ayırt edildiğini doğrular.
+
+içe al "kutuphane/test.tan"
+
+işlev dön(x):
+    döndür x + 1
+son
+
+işlev don(x):
+    döndür x + 10
+son
+
+işlev şekil(x):
+    döndür x * 2
+son
+
+işlev değer(x):
+    döndür x * 3
+son
+
+işlev çarp(a, b):
+    döndür a * b
+son
+
+işlev kök(x):
+    döndür x - 1
+son
+
+gecti = 0
+toplam = 0
+
+# T1: opsiyonel ':' ile tanımlı dön/don farklı işlevler (ö/o ayrımı)
+toplam = toplam + 1
+gecti = gecti + iddiaDogru((dön(5) == 6) ve (don(5) == 15), "T1: dön(5)==6 ve don(5)==15 (farkli islevler)")
+
+# T2: ş karakteri
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(20, şekil(10), "T2: şekil(10) == 20")
+
+# T3: ğ karakteri
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(30, değer(10), "T3: değer(10) == 30")
+
+# T4: ö, ü içeren değişken adları
+önek = 7
+ülke = 8
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(15, önek + ülke, "T4: onek + ulke == 15")
+
+# T5: ç karakteri
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(12, çarp(3, 4), "T5: carp(3,4) == 12")
+
+# T6: ö karakteri (işlev adında)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(9, kök(10), "T6: kok(10) == 9")
+
+d = testSonuc(gecti, toplam)

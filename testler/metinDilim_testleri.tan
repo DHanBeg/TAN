@@ -1,0 +1,47 @@
+# metinDilim_testleri.tan — bulk substring/pad builtin'inin (TancElf.tan
+# f_metin_dilim) doğruluk testi: kırpma (hedef < kaynak), dolgu (hedef >
+# kaynak, kalan sıfır bayt olmalı), tam eşleşme, ofsetli dilim (bas>0).
+
+içe al "kutuphane/test.tan"
+
+işlev ilkN(s, n)
+    r = ""
+    i = 0
+    iken i < n
+        r = metinBirlestir(r, metinAl(s, i))
+        i = i + 1
+    son
+    döndür r
+son
+
+gecti = 0
+toplam = 0
+
+# T1: kirpma - "MERHABADUNYA" (12) -> hedef 7 -> "MERHABA"
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("MERHABA", metinDilim("MERHABADUNYA", 0, 7), "T1: kirpma dogru")
+
+# T2: dolgu - "AB" (2) -> hedef 6, kalan 4 bayt sifir (kod(0)==0 ile dogrula)
+sonuc2 = metinDilim("AB", 0, 6)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(6, uzunluk(sonuc2), "T2: dolgu uzunluk=6")
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("AB", ilkN(sonuc2, 2), "T2: dolgu ilk 2 bayt korunmus")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, kod(metinAl(sonuc2, 2)), "T2: dolgu 3. bayt sifir")
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, kod(metinAl(sonuc2, 5)), "T2: dolgu son bayt sifir")
+
+# T3: tam esitlik - "ABCDE" (5) -> hedef 5 -> degismemeli
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("ABCDE", metinDilim("ABCDE", 0, 5), "T3: tam esit uzunluk")
+
+# T4: ofsetli dilim - "0123456789"'dan [3,3+4) -> "3456"
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("3456", metinDilim("0123456789", 3, 4), "T4: ofsetli dilim")
+
+# T5: bos hedef (0 uzunluk)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, uzunluk(metinDilim("HERSEY", 0, 0)), "T5: hedef=0 -> bos metin")
+
+d = testSonuc(gecti, toplam)

@@ -2,16 +2,23 @@
 # Islem.tan — VETA Transaction (İşlem) katmanı: PageManager + Wal koordinasyonu
 # ------------------------------------------------------------
 # Eski veta/libraries/storage/source/transaction.tan (tasarım notu,
-# sıfır kod) yerine sıfırdan yazıldı. ACID durumu (dürüst):
-#   Atomicity: EVET — commit öncesi rollback tüm değişiklikleri geri alır.
+# sıfır kod) yerine sıfırdan yazıldı. ACID durumu (dürüst, 2026-09-08
+# güncellemesi — fsync + crash-recovery eklendi):
+#   Atomicity: EVET — commit öncesi rollback tüm değişiklikleri geri alır;
+#     crash sonrası da islemKurtar loser tx'leri undo eder.
 #   Consistency: uygulamanın sorumluluğu (bu katman garanti etmez).
 #   Isolation: YOK — tek-thread varsayımı (2D eşzamanlılık ayrı, yazılmadı).
-#   Durability: KISMİ — fsync yok (2B'nin sınırı), crash-recovery yok.
+#   Durability: EVET (commit-zamanlı) — islemCommit WAL'a commit işareti
+#     yazıp dosyaSenkron (fsync) çağırıyor; commit döndüğünde WAL diskte
+#     garanti. Sayfa yazımlarının kendisi fsync'li DEĞİL (gerek yok —
+#     redo WAL'dan yeniden kurar). WAL checkpoint/kırpma YOK (dürüst
+#     sınır, ayrı iş) — recovery her seferinde WAL'ı baştan tarar.
 #
 # Kullanım:
 #   içe al "kutuphane/Islem.tan"
 #   pm  = pmAc("veri.db")
 #   wal = walAc("veri.wal")
+#   z   = islemKurtar(pm, wal)   # açılışta ÖNCE recovery (crash sonrası şart)
 #   tx  = islemBaslat(pm, wal, 1)
 #   z   = islemSayfaYaz(tx, no, "yeni icerik")
 #   z   = islemCommit(tx)      # ya da islemRollback(tx)
@@ -51,12 +58,21 @@ işlev islemSayfaYaz(tx, sayfaNo, yeniIcerik)
 son
 
 # değişiklikleri kalıcı kabul eder (durum=KOMIT). Sayfalar zaten
-# islemSayfaYaz sırasında yazılmıştı — commit sadece durumu işaretler
-# (WAL'a redo-sonrası temizlik/crash-recovery bu eklemenin kapsamı dışında).
+# islemSayfaYaz sırasında yazılmıştı — commit WAL'a commit işareti yazar
+# VE fsync eder (her-commit-fsync): bu çağrı 0 döndüğünde WAL diskte
+# garantilenmiştir, crash sonrası islemKurtar bu tx'i "kazanan" (redo)
+# sayacaktır. fsync başarısızsa (negatif dönerse) durum yine de KOMIT
+# işaretlenir — çağıran dönüş değerini kontrol etmeli (dürüst sınır:
+# bu katman fsync hatasında otomatik geri almıyor).
 işlev islemCommit(tx)
+    wal = tx[1]
+    txId = tx[2]
     durumKutu = tx[3]
+    z = walEkleCommit(wal, txId)
+    fd = wal[0]
+    senkronSonuc = dosyaSenkron(fd)
     durumKutu[0] = 1
-    döndür 0
+    döndür senkronSonuc
 son
 
 # bu transaction'ın WAL'a yazdığı TÜM değişiklikleri (baslangicLsn'den
@@ -76,4 +92,87 @@ işlev islemRollback(tx)
     son
     durumKutu[0] = 2
     döndür 0
+son
+
+# iç yardımcı: txId, komitli (walEkleCommit) txId listesinde mi?
+işlev walTxKomitliMi(komitliListe, txId)
+    i = 0
+    n = uzunluk(komitliListe)
+    iken i < n
+        eğer komitliListe[i] == txId ise
+            döndür 1
+        son
+        i = i + 1
+    son
+    döndür 0
+son
+
+# CRASH-RECOVERY (streaming, 2026-09-09 yeniden yazım — bkz. Wal.tan
+# dosya başı DÜZELTME notu: ilk deneme TAM kayıt okuyarak 4 geçiş yaptı,
+# TancElf arena taştı, WSL çöktü). pmAc/walAc'tan HEMEN SONRA, herhangi
+# bir islemBaslat'tan ÖNCE çağrılmalı. İKİ geçiş, HER İKİSİ DE STREAMING
+# (bir kayıt oku → uygula/işle → bırak, biriktirme YOK — komitli txId
+# listesi hariç, o küçük ve gerekli):
+#   1) MARKER TARAMASI (ucuz): walBaslikOku (64 bayt, checksum YOK) ile
+#      HER lsn'in sadece başlığını okur, "C:" (commit) taşıyanların
+#      txId'sini komitli listesine ekler. Tam kayıt (8288 bayt) YOK.
+#   2) REDO (tam kayıt, ileri yönde): walKayitOku ile GERÇEKTEN okur;
+#      checksum bozuksa (gecerli=0) DURUR — bu, recovery'nin güvenle
+#      tarayabildiği sınırdır (ayrı bir walGecerliSinir ön-taraması
+#      YOK artık, sınır bu geçişe gömülü). Komitli tx'lerin TÜM sayfa
+#      yazımlarını lsn sırasıyla tekrar uygular (idempotent).
+#   3) UNDO (tam kayıt, GERİ yönde, sadece sınıra kadar): komitli
+#      OLMAYAN ("kaybeden"/yarım kalmış) tx'lerin yazımlarını TERS lsn
+#      sırasıyla geri alır.
+# Döndürdüğü değer: güvenle taranan kayıt sayısı (sinir, REDO geçişinde
+# bulunur).
+işlev islemKurtar(pm, wal)
+    n = walSonLsn(wal)
+    komitli = []
+    i = 0
+    iken i < n
+        bas = walBaslikOku(wal, i)
+        tur = metinBirlestir("", bas[1])
+        eğer metinEsit(tur, "C") ise
+            txId = bas[0]
+            komitli = ekle(komitli, txId)
+        son
+        i = i + 1
+    son
+    sinir = n
+    i = 0
+    iken i < n
+        kayit = walKayitOku(wal, i)
+        gecerli = kayit[5]
+        eğer gecerli == 0 ise
+            sinir = i
+            i = n
+        değilse
+            tur = metinBirlestir("", kayit[4])
+            eğer metinEsit(tur, "W") ise
+                txId = kayit[3]
+                eğer walTxKomitliMi(komitli, txId) ise
+                    sayfaNo = kayit[0]
+                    yeniIcerik = kayit[2]
+                    z = pmSayfaYaz(pm, sayfaNo, yeniIcerik)
+                son
+            son
+            i = i + 1
+        son
+    son
+    i = sinir - 1
+    iken i >= 0
+        kayit = walKayitOku(wal, i)
+        tur = metinBirlestir("", kayit[4])
+        eğer metinEsit(tur, "W") ise
+            txId = kayit[3]
+            eğer walTxKomitliMi(komitli, txId) == 0 ise
+                sayfaNo = kayit[0]
+                eskiIcerik = kayit[1]
+                z = pmSayfaYaz(pm, sayfaNo, eskiIcerik)
+            son
+        son
+        i = i - 1
+    son
+    döndür sinir
 son

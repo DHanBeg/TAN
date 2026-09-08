@@ -96,7 +96,60 @@ gecti = gecti + iddiaMetin("COMMITLENDI", ilkN(s1, 11), "islemRollback (coklu sa
 toplam = toplam + 1
 gecti = gecti + iddiaMetin("SAYFA2-ORIJINAL", ilkN(s2, 15), "islemRollback (coklu sayfa): sayfa2 geri alindi")
 
+# ---- Islem: commit-zamanli fsync donus degeri ----
+tx4 = islemBaslat(pm2, wal, txSayac[0])
+txSayac[0] = txSayac[0] + 1
+z = islemSayfaYaz(tx4, no1, "FSYNCLI")
+fsyncSonuc = islemCommit(tx4)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, fsyncSonuc, "islemCommit: fsync basarili (0) donuyor")
+
+# ---- Crash-recovery: REDO — commit sonrasi sayfa "kaybolursa" (WAL
+# disinda dogrudan bozma ile simule edilir) islemKurtar WAL'dan geri kurar ----
+no3 = pmSayfaAyir(pm2)
+tx5 = islemBaslat(pm2, wal, txSayac[0])
+txSayac[0] = txSayac[0] + 1
+z = islemSayfaYaz(tx5, no3, "KAZANDI")
+z = islemCommit(tx5)
+z = pmSayfaYaz(pm2, no3, "BOZUK-SAYFA-KAYBOLDU")
+onceki = pmSayfaOku(pm2, no3)
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("BOZUK-SAYFA-KAYBOLDU", ilkN(onceki, 20), "kurtarma-oncesi: sayfa bozuk (kaybolan yazim simulasyonu)")
+z = islemKurtar(pm2, wal)
+sonrasi = pmSayfaOku(pm2, no3)
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("KAZANDI", ilkN(sonrasi, 7), "islemKurtar: REDO - komitli tx sayfasi WAL'dan geri kuruldu")
+
+# ---- Crash-recovery: UNDO — commit'siz/yarim kalan (ne commit ne
+# rollback cagrilan) tx'nin sayfaya yazdigi islemKurtar tarafindan geri alinir ----
+no4 = pmSayfaAyir(pm2)
+z = pmSayfaYaz(pm2, no4, "ONCEKI-DEGER")
+tx6 = islemBaslat(pm2, wal, txSayac[0])
+txSayac[0] = txSayac[0] + 1
+z = islemSayfaYaz(tx6, no4, "KAYBOLMALI-COMMITSIZ")
+kurtarmaOncesi = pmSayfaOku(pm2, no4)
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("KAYBOLMALI-COMMITSIZ", ilkN(kurtarmaOncesi, 20), "kurtarma-oncesi: commitsiz yazim sayfada gorunuyor")
+z = islemKurtar(pm2, wal)
+kurtarmaSonrasi = pmSayfaOku(pm2, no4)
+toplam = toplam + 1
+gecti = gecti + iddiaMetin("ONCEKI-DEGER", ilkN(kurtarmaSonrasi, 12), "islemKurtar: UNDO - commit'siz tx'nin yazdigi geri alindi")
+
 z = walKapat(wal)
 z = pmKapat(pm2)
+
+# ---- WAL checksum: bozuk kayit recovery sinirini kesiyor ----
+fdBozukTemiz = dosyaAc("/tmp/tan_test_wal_bozuk.wal", 1)
+z = dosyaYazKonum(fdBozukTemiz, 0, "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+z = dosyaKapat(fdBozukTemiz)
+wal2 = walAc("/tmp/tan_test_wal_bozuk.wal")
+lsnA = walEkle(wal2, 99, 0, "eski", "yeni")
+fdBozuk = wal2[0]
+konumBozuk = walBasligBoyut() + lsnA * walKayitBoyutu() + walBasligBoyut() + pageBoyut() * 2
+z = dosyaYazKonum(fdBozuk, konumBozuk, "BADHASH!")
+sinir = walGecerliSinir(wal2)
+toplam = toplam + 1
+gecti = gecti + iddiaSayi(0, sinir, "walGecerliSinir: bozuk checksum'li ilk kayitta durur (sinir=0)")
+z = walKapat(wal2)
 
 d = testSonuc(gecti, toplam)
