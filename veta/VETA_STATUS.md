@@ -349,15 +349,30 @@ import edilmiyorlar. Listeye yazıldı, kaldırma kararı ayrı bir turda.
   8/8, `dosyaSenkron_testleri` 2/2) ve gerçek SIGKILL crash-harness
   (`wal_crash_harness.sh`) her iki kökte de GEÇTİ.
 
-  **AÇIK, KAPANMAMIŞ:** `tancelf-seed-4dc821c` artık bayat — `BOOTSTRAP.md`
-  Adım 2'yi (seed → gen1) HEAD üzerinde harfiyen çalıştırmak `bilinmeyen
-  deyim: :` hatasıyla düşüyor; bugünkü kapanış yalnızca yukarıdaki manuel
-  colon-strip ara-adımıyla mümkün oldu, bu adım hiçbir belgeye yazılmadı.
-  `BOOTSTRAP.md`'nin kendi prosedürü, dokümante haliyle, şu an HEAD'de
-  ÇALIŞMIYOR. Kapatmak için: `802d2966...` hash'li binary'yi yeni bir
-  `tancelf-seed-<HEAD-kısa-hash>` GitHub Release'ine yükleyip eskisinin
-  yerine geçirmek (`BOOTSTRAP.md`'nin "Yeni seed ne zaman üretilir" bölümü
-  zaten bunu öngörüyor) — henüz YAPILMADI, karar bekliyor.
+  **Çift-tanıklı doğrulama (2026-09-10):** Yukarıdaki sonuç iki BAĞIMSIZ
+  kökten teyit edildi — (a) bu makinedeki bayat yerel `gen3`, (b) sıfır-
+  artifact temiz `git clone` (`/tmp/tan-clean`) + GitHub'daki resmî
+  `tancelf-seed-4dc821c` release'i (md5 doğrulandı). İkisi de AYNI
+  `802d2966...` hash'ine ulaştı — tek-makine şansı ihtimali bununla
+  kapandı.
+
+  **Ayrım testi — colon-strip ara-adımı zincirin kalıcı bir parçası mı,
+  yoksa yalnızca ESKİ seed'i aşmak için tek seferlik mi?** `802d2966...`
+  (yeni sabit nokta) binary'sinin kendisiyle, HİÇBİR ara-adım OLMADAN,
+  doğrudan HEAD'deki `TancElf.tan`'ı (colon'lu) derlemesi denendi:
+  BAŞARILI, çıktı yine `802d2966...` (kendini birebir üretti). Yani
+  colon-strip SADECE eski/bayat seed'i (6 Eylül, c1ff3e5'ten önce) aşmak
+  için gerekliydi — yeni sabit nokta seed olarak kullanılırsa
+  `BOOTSTRAP.md`'nin Adım 1-3'ü (zaten `<commit>` için generic yazılmış,
+  hardcoded tag YOK, düzeltilecek satır yok) HİÇBİR ek adım olmadan
+  HEAD'de çalışır. **Senaryo 1 doğrulandı.**
+
+  **Seed kesme HAZIR, henüz YAYINLANMADI — yayın eylemi bilerek yapılmadı:**
+  binary `~/verify/genC` (WSL, kalıcı — `/tmp` değil), sha256
+  `802d2966ef0e7854286070691b04364bfc14768a95ed25af46df7c59cc5c7f9a`, md5
+  `f48946ad860e14d7f31e7c1ee3e82983`, 462111 bayt, kaynak commit `2327e8d`
+  (HEAD). GitHub Release publish'i geri alması zor + herkese görünür bir
+  eylem — bunu ajan değil, Demir kendi kimliğiyle yapacak.
 
 #### Query (Sorgu) — MİNİMAL DİLİM UYGULANDI (2026-08-23, gerçekten çalıştırıldı)
 - `libraries/query/source/query.tan`: eski tasarım yorumu KORUNDU, altına
