@@ -344,7 +344,13 @@ import edilmiyorlar. Listeye yazıldı, kaldırma kararı ayrı bir turda.
   `/tmp/tan-clean`'e SIFIR yerel artifact'le çekilen temiz klon + resmi
   `tancelf-seed-4dc821c` release'i (md5 doğrulandı) — ikisi de zincirin
   sonunda **aynı hash'e** yakınsadı: `sha256 802d2966ef0e7854286070691b04364b
-  fc14768a95ed25af46df7c59cc5c7f9a` (462111 bayt), gen(N)==gen(N+1). Test
+  fc14768a95ed25af46df7c59cc5c7f9a` (462111 bayt), gen(N)==gen(N+1).
+  **Kalibrasyon notu:** bu iki kök AYNI makinede (bu WSL), aynı OS/kernel/
+  libc/toolchain üzerinde çalıştı — tek-dizin şansını eledi, ama
+  makineler-arası (farklı kernel/libc/donanım) reproducibility'yi
+  KANITLAMAZ. Doğru ifade "bu toolchain'de reproducible", "reproducible"
+  tek başına değil — kapsam abartılmasın. Ayrı makine denemesi ayrı iş,
+  bu turun kapsamı dışında bırakıldı. Test
   paketi (`storage_testleri` 19/19, `crc32_testleri` 5/5, `metinDilim_testleri`
   8/8, `dosyaSenkron_testleri` 2/2) ve gerçek SIGKILL crash-harness
   (`wal_crash_harness.sh`) her iki kökte de GEÇTİ.
@@ -353,8 +359,10 @@ import edilmiyorlar. Listeye yazıldı, kaldırma kararı ayrı bir turda.
   kökten teyit edildi — (a) bu makinedeki bayat yerel `gen3`, (b) sıfır-
   artifact temiz `git clone` (`/tmp/tan-clean`) + GitHub'daki resmî
   `tancelf-seed-4dc821c` release'i (md5 doğrulandı). İkisi de AYNI
-  `802d2966...` hash'ine ulaştı — tek-makine şansı ihtimali bununla
-  kapandı.
+  `802d2966...` hash'ine ulaştı — tek-DİZİN şansı ihtimali bununla kapandı.
+  Kapsam sınırı yukarıdaki kalibrasyon notuyla aynı: bu hâlâ tek makine
+  (aynı OS/kernel/libc) — makineler-arası reproducibility ayrı, kapanmamış
+  iş.
 
   **Ayrım testi — colon-strip ara-adımı zincirin kalıcı bir parçası mı,
   yoksa yalnızca ESKİ seed'i aşmak için tek seferlik mi?** `802d2966...`
