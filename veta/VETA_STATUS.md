@@ -314,6 +314,23 @@ import edilmiyorlar. Listeye yazıldı, kaldırma kararı ayrı bir turda.
        borcuna iki kez çarptı (string-padding, sha256), üçüncü katman
        biriktirmeden kapatılacak.
 
+  **Provenance notu (2026-09-09, `c1ff3e5` sonrası denetim):** `c1ff3e5`'teki
+  `kutuphane/Islem.tan` diff'i (islemCommit fsync + islemKurtar crash-recovery)
+  İÇERİK olarak doğrulandı — commit mesajıyla eşleşiyor, kendi içinde tutarlı.
+  Ama bu diff'in, önceki bir oturumun başında dirty/pre-session bulunup
+  dokunulmadan bırakılmış Islem.tan durumuyla birebir sürekliliği GİT-İSPATLI
+  DEĞİL: o an snapshot/stash alınmamıştı, reflog'da ayrı bir "incelendi" adımı
+  yok. Sonuç tutarlılıktan ÇIKARIM, commit zincirinden KANIT değil — commit'in
+  doğruluğunu etkilemiyor, sadece tarihçesinin git-izinin eksik olduğunu
+  gösteriyor. Ayrım bilerek not ediliyor ki zamanla "çıkarım" "kanıt"a
+  dönüşmesin (bu dosyanın 2026-08-21 denetiminde tam bu kalıptan zarar
+  görülmüştü).
+
+  **Disiplin kuralı (ileriye dönük):** Bir oturum başında pre-session dirty
+  bir dosya bulunursa, üstüne DEVAM EDİLMEDEN önce `git stash` (ya da küçük
+  bir WIP commit) alınacak — provenance her zaman git'ten ispatlanabilir
+  olsun, tutarlılıktan çıkarıma düşülmesin.
+
 #### Query (Sorgu) — MİNİMAL DİLİM UYGULANDI (2026-08-23, gerçekten çalıştırıldı)
 - `libraries/query/source/query.tan`: eski tasarım yorumu KORUNDU, altına
   gerçek kod eklendi. Tam SQL parser DEĞİL — basit fonksiyon API'si:
