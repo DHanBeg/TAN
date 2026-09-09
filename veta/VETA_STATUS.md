@@ -375,12 +375,22 @@ import edilmiyorlar. Listeye yazıldı, kaldırma kararı ayrı bir turda.
   hardcoded tag YOK, düzeltilecek satır yok) HİÇBİR ek adım olmadan
   HEAD'de çalışır. **Senaryo 1 doğrulandı.**
 
-  **Seed kesme HAZIR, henüz YAYINLANMADI — yayın eylemi bilerek yapılmadı:**
-  binary `~/verify/genC` (WSL, kalıcı — `/tmp` değil), sha256
-  `802d2966ef0e7854286070691b04364bfc14768a95ed25af46df7c59cc5c7f9a`, md5
-  `f48946ad860e14d7f31e7c1ee3e82983`, 462111 bayt, kaynak commit `2327e8d`
-  (HEAD). GitHub Release publish'i geri alması zor + herkese görünür bir
-  eylem — bunu ajan değil, Demir kendi kimliğiyle yapacak.
+  **Seed YAYINLANDI ve release-asset üzerinden doğrulandı (2026-09-10,
+  KAPANDI):** `tancelf-seed-f61d3b7` — https://github.com/DHanBeg/TAN/releases/tag/tancelf-seed-f61d3b7
+  — Demir'in açık onayıyla (`git diff f61d3b7 HEAD --stat` önce teyit
+  edildi: aradaki tek fark `veta/VETA_STATUS.md`, `TancElf.tan` dokunulmamış
+  — tag içeriği kaymadı) yayınlandı. Kapanış, `gh release create`'in
+  başarılı dönüşüne değil, release-asset'in KENDİSİNDEN geri-üretilen
+  kanıta dayanıyor:
+  1. Release'ten asset geri indirildi → sha256 `802d2966...` — birebir.
+  2. O indirilen asset, GitHub'dan SIFIRDAN çekilen ayrı bir temiz klonda
+     (üçüncü bağımsız dizin), colon-strip veya başka ara-adım OLMADAN
+     HEAD'deki `TancElf.tan`'ı doğrudan derledi → yine `802d2966...`.
+  3. Ürettiği binary çalışıyor: `storage_testleri` 19/19.
+  `BOOTSTRAP.md` artık HEAD'de dokümante haliyle (ek adımsız) çalışıyor.
+  Kapsam hâlâ sınırlı: bu doğrulama da aynı toolchain/OS üzerinde —
+  makineler-arası reproducibility teyit edilmedi (yukarıdaki kalibrasyon
+  notuyla aynı sınır).
 
 #### Query (Sorgu) — MİNİMAL DİLİM UYGULANDI (2026-08-23, gerçekten çalıştırıldı)
 - `libraries/query/source/query.tan`: eski tasarım yorumu KORUNDU, altına
