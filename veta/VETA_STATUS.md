@@ -331,6 +331,34 @@ import edilmiyorlar. Listeye yazıldı, kaldırma kararı ayrı bir turda.
   bir WIP commit) alınacak — provenance her zaman git'ten ispatlanabilir
   olsun, tutarlılıktan çıkarıma düşülmesin.
 
+  **Self-hosting fixed-point notu (2026-09-10, `c1ff3e5` retroaktif kapanış):**
+  `c1ff3e5` `TancElf.tan`'ı 532 satır değiştirdi (opsiyonel `:` sözdizimi +
+  `metinDilim` builtin) ama dört kanıt kapısından hiçbiri gen-sabit-nokta
+  değildi — `BOOTSTRAP.md`'nin kendi kuralı ("derleyicinin kendi kodu yeni
+  bir özelliği kullanmaya başladığında seed güncellenebilir") burada tetiklendi
+  ve kaçırıldı. Retroaktif olarak kapatıldı: `TancElf.tan`'daki 220 kozmetik
+  `:` eki ayıklanıp eski-sözdizimli bir ara-kaynak üretildi (gerçek mantık
+  değişikliği — `deyimDerle` opsiyonel `:` yutma, `metinDilim` — zaten eski
+  sözdizimiyle yazılmıştı, ayrılabilirdi). Bu ara-kaynak İKİ bağımsız kökten
+  derlendi — (a) bu makinedeki bayat `gen3` (22 Ağustos, git-dışı), (b)
+  `/tmp/tan-clean`'e SIFIR yerel artifact'le çekilen temiz klon + resmi
+  `tancelf-seed-4dc821c` release'i (md5 doğrulandı) — ikisi de zincirin
+  sonunda **aynı hash'e** yakınsadı: `sha256 802d2966ef0e7854286070691b04364b
+  fc14768a95ed25af46df7c59cc5c7f9a` (462111 bayt), gen(N)==gen(N+1). Test
+  paketi (`storage_testleri` 19/19, `crc32_testleri` 5/5, `metinDilim_testleri`
+  8/8, `dosyaSenkron_testleri` 2/2) ve gerçek SIGKILL crash-harness
+  (`wal_crash_harness.sh`) her iki kökte de GEÇTİ.
+
+  **AÇIK, KAPANMAMIŞ:** `tancelf-seed-4dc821c` artık bayat — `BOOTSTRAP.md`
+  Adım 2'yi (seed → gen1) HEAD üzerinde harfiyen çalıştırmak `bilinmeyen
+  deyim: :` hatasıyla düşüyor; bugünkü kapanış yalnızca yukarıdaki manuel
+  colon-strip ara-adımıyla mümkün oldu, bu adım hiçbir belgeye yazılmadı.
+  `BOOTSTRAP.md`'nin kendi prosedürü, dokümante haliyle, şu an HEAD'de
+  ÇALIŞMIYOR. Kapatmak için: `802d2966...` hash'li binary'yi yeni bir
+  `tancelf-seed-<HEAD-kısa-hash>` GitHub Release'ine yükleyip eskisinin
+  yerine geçirmek (`BOOTSTRAP.md`'nin "Yeni seed ne zaman üretilir" bölümü
+  zaten bunu öngörüyor) — henüz YAPILMADI, karar bekliyor.
+
 #### Query (Sorgu) — MİNİMAL DİLİM UYGULANDI (2026-08-23, gerçekten çalıştırıldı)
 - `libraries/query/source/query.tan`: eski tasarım yorumu KORUNDU, altına
   gerçek kod eklendi. Tam SQL parser DEĞİL — basit fonksiyon API'si:
